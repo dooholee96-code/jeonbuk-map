@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>전북 농촌유학·학교 통합지도</title>
+<meta name="description" content="전북특별자치도 14개 시군의 초·중·고등학교와 농촌유학 운영·희망학교, 지역 체험자원을 한 지도에서 봅니다.">
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+
+<header>
+  <div class="head-top">
+    <div class="brand">
+      <h1>전북 농촌유학·학교 통합지도</h1>
+      <span class="sub">14개 시군 · 초·중·고 · 체험자원</span>
+    </div>
+    <div class="head-tools">
+      <label class="lblsel">라벨
+        <select id="labelMode">
+          <option value="auto">자동</option>
+          <option value="all">전체</option>
+          <option value="rural">농촌유학만</option>
+          <option value="none">숨기기</option>
+        </select>
+      </label>
+      <button class="btn" id="btnFit">지역 맞춤</button>
+      <button class="btn" id="btnGeocode" title="좌표 미확정 학교를 카카오 장소검색으로 실제 위치에 맞춥니다">좌표 보정</button>
+      <button class="btn primary" id="btnExport" title="보정 결과를 data/regions/&lt;시군&gt;.js 형식으로 내려받습니다">데이터 내보내기</button>
+      <button class="btn" id="btnResetCache" title="브라우저에 저장된 보정 결과 삭제">초기화</button>
+    </div>
+  </div>
+</header>
+
+<div id="shell">
+  <aside id="panel">
+    <div class="panel-head">
+      <h2 class="panel-title"><span class="pin" aria-hidden="true"></span>학교·농촌유학 지도</h2>
+
+      <div class="selects">
+        <select id="regionSel" aria-label="지역 선택"></select>
+        <select id="typeSel" aria-label="형태 선택">
+          <option value="">= 형태 전체 =</option>
+          <option value="elem">초등학교</option>
+          <option value="mid">중학교</option>
+          <option value="high">고등학교</option>
+          <option value="op">★ 농촌유학 운영학교</option>
+          <option value="hope">☆ 농촌유학 희망학교</option>
+          <option value="rural">농촌유학 운영＋희망</option>
+        </select>
+      </div>
+
+      <div class="search-wrap">
+        <input id="search" type="search" placeholder="학교명 또는 주소 검색" autocomplete="off">
+      </div>
+    </div>
+
+    <div id="summary"></div>
+    <div id="list"></div>
+  </aside>
+
+  <div id="mapWrap">
+    <div id="map"></div>
+
+    <button id="panelToggle" title="목록 접기/펴기">☰</button>
+
+    <div id="detail"></div>
+
+    <details id="legend" open>
+      <summary>범례</summary>
+      <div class="lg"><i style="background:#3b82f6"></i> 초등학교</div>
+      <div class="lg"><i style="background:#ef4444"></i> 중학교</div>
+      <div class="lg"><i style="background:#8b5cf6"></i> 고등학교</div>
+      <hr>
+      <div class="lg"><i style="background:#00e676;width:17px;height:17px"></i> <b style="color:#006400">★ 농촌유학 운영</b></div>
+      <div class="lg"><i style="background:#ff9100;width:17px;height:17px"></i> <b style="color:#e65100">☆ 농촌유학 희망</b></div>
+      <hr>
+      <div class="lg"><i style="background:#94a3b8;border-style:dashed"></i> 좌표 미확정</div>
+    </details>
+
+    <div id="toast"></div>
+  </div>
+</div>
+
+<!-- 데이터 (외부 요청 없이 로컬 파일만으로 동작하도록 .js 로 제공) -->
+<script src="assets/js/config.js"></script>
+<script src="assets/data/boundaries.js"></script>
+<script src="assets/data/eupmyeon.js"></script>
+
+<script src="data/regions/jinan.js"></script>
+<script src="data/regions/imsil.js"></script>
+<script src="data/regions/jeongeup.js"></script>
+<script src="data/regions/sunchang.js"></script>
+<script src="data/regions/namwon.js"></script>
+<script src="data/regions/jangsu.js"></script>
+<script src="data/regions/muju.js"></script>
+<script src="data/regions/gochang.js"></script>
+<script src="data/regions/buan.js"></script>
+<script src="data/regions/wanju.js"></script>
+<script src="data/regions/gimje.js"></script>
+<script src="data/regions/jeongju.js"></script>
+<script src="data/regions/iksan.js"></script>
+<script src="data/regions/gunsan.js"></script>
+
+<!-- 카카오맵 SDK (services = 장소·주소 검색) -->
+<script>
+  document.write('<scr' + 'ipt src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=' +
+    JB.KAKAO_KEY + '&libraries=services&autoload=false"></scr' + 'ipt>');
+</script>
+
+<script src="assets/js/labels.js"></script>
+<script src="assets/js/geocode.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
