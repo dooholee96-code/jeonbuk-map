@@ -225,13 +225,6 @@ body.panel-collapsed #panel { margin-left: calc(-1 * var(--panel-w)); }
 .txt-rural-hope { color: #e65100; border: 3px solid #ff9100; }
 .name-text.is-approx { opacity: .6; font-style: italic; }
 
-.res-pin {
-  display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
-  background: #fff; border: 2px solid var(--c); border-radius: 999px;
-  padding: 3px 10px 3px 5px; font-size: 12.5px; font-weight: 700; color: var(--c);
-  box-shadow: 0 2px 6px rgba(0,0,0,.2); white-space: nowrap;
-}
-
 /* ── 상세 카드 ──────────────────────────────────────── */
 #detail {
   position: absolute; right: 16px; top: 16px; width: 300px; z-index: 25;

@@ -10,8 +10,7 @@
     kind: '',              // '' | elem | mid | high | op | hope | rural
     labelMode: 'auto',     // auto | all | rural | none
     query: '',
-    selected: null,
-    showResources: true
+    selected: null
   };
 
   var map, overlays = [], maskPolygon = null, outlinePolys = [], items = [];
@@ -204,16 +203,6 @@
     });
   }
 
-  function activeResources() {
-    if (!state.showResources) return [];
-    var keys = state.region ? [state.region] : Object.keys(JB.DATA);
-    var list = [];
-    keys.forEach(function (k) {
-      (JB.DATA[k] ? JB.DATA[k].resources : []).forEach(function (r) { r._region = k; list.push(r); });
-    });
-    return list;
-  }
-
   function styleOf(s) {
     if (s.rural === '운영') return { cls: 'rural-op', dot: JB.RURAL.op.dot, text: JB.RURAL.op.text, mark: '★', weight: 100, boxed: true, size: 21 };
     if (s.rural === '희망') return { cls: 'rural-hope', dot: JB.RURAL.hope.dot, text: JB.RURAL.hope.text, mark: '☆', weight: 90, boxed: true, size: 21 };
@@ -272,20 +261,6 @@
         ox: s.ox || 0, oy: s.oy || 0,
         weight: st.weight + (s.rural ? 50 : 0)
       });
-    });
-
-    activeResources().forEach(function (r) {
-      var cat = JB.RESOURCE_CATS[r.cat] || { color: '#64748b', icon: '📍' };
-      var el = document.createElement('div');
-      el.className = 'res-pin';
-      el.style.setProperty('--c', cat.color);
-      el.innerHTML = '<span class="res-icon">' + cat.icon + '</span><span class="res-name">' + r.n + '</span>';
-      el.addEventListener('click', function (e) { e.stopPropagation(); selectResource(r); });
-      var ov = new kakao.maps.CustomOverlay({
-        position: new kakao.maps.LatLng(r.lat, r.lng), content: el, zIndex: 15, xAnchor: 0.5, yAnchor: 1
-      });
-      ov.setMap(map);
-      overlays.push(ov);
     });
 
     // 라벨 실측: 전부 DOM에 올린 뒤 한 번만 읽어 리플로를 1회로 묶는다
@@ -485,20 +460,6 @@
       panel.classList.remove('open'); state.selected = null; scheduleRelayout();
     };
     panel.querySelector('#pickOnMap').onclick = function () { startPick(s); };
-    scheduleRelayout();
-  }
-
-  function selectResource(r) {
-    var cat = JB.RESOURCE_CATS[r.cat] || {};
-    var panel = $('#detail');
-    panel.classList.add('open');
-    panel.innerHTML =
-      '<button class="close" aria-label="닫기">×</button>' +
-      '<div class="d-kind" style="color:' + (cat.color || '#334155') + '">체험자원 · ' + (cat.label || r.cat) + '</div>' +
-      '<h3>' + esc(r.n) + '</h3>' +
-      (r.desc ? '<p class="d-desc">' + esc(r.desc) + '</p>' : '') +
-      (r.tags && r.tags.length ? '<div class="d-tags">' + r.tags.map(function (t) { return '<span>#' + esc(t) + '</span>'; }).join('') + '</div>' : '');
-    panel.querySelector('.close').onclick = function () { panel.classList.remove('open'); scheduleRelayout(); };
     scheduleRelayout();
   }
 

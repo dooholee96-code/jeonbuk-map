@@ -19,16 +19,6 @@ JB.RURAL = {
   hope: { label: '농촌유학 희망학교', mark: '☆', dot: '#ff9100', text: '#e65100', rank: 4 }
 };
 
-/* 체험자원 분류 (학교 밖 마을·시설 레이어) */
-JB.RESOURCE_CATS = {
-  farm:    { label: '농촌·생업체험', color: '#16a34a', icon: '🌾' },
-  nature:  { label: '생태·자연',     color: '#0d9488', icon: '🌲' },
-  history: { label: '역사·문화',     color: '#b45309', icon: '🏛' },
-  art:     { label: '예술·공예',     color: '#c026d3', icon: '🎨' },
-  sports:  { label: '체육·모험',     color: '#2563eb', icon: '⛰' },
-  stay:    { label: '유학생 거주',   color: '#e11d48', icon: '🏡' }
-};
-
 /* 14개 시군. priority 낮을수록 먼저 정비. status: ready | seed | planned */
 JB.REGIONS = [
   { key: 'jinan',    name: '진안군', center: [35.79, 127.44], level: 9,  priority: 1 },
@@ -53,8 +43,7 @@ JB.REGIONS = [
      updated:  'YYYY-MM-DD',
      verified: true | false,      // 좌표·목록 검수 완료 여부
      note:     '데이터 출처/주의사항',
-     schools:  [ { n, t, ph, rural, lat, lng, approx, ox, oy, addr, tel, students, tags, desc } ],
-     resources:[ { n, cat, lat, lng, desc, tags } ]
+     schools:  [ { n, t, ph, rural, lat, lng, approx, ox, oy, addr, tel, stu, cls, tags, desc } ]
    }
    n=이름 t=학교급(elem|mid|high) ph=읍면동 rural='운영'|'희망'
    approx=true 면 좌표 미확정(읍면 중심 임시값) ox/oy=라벨 수동 오프셋(px)
@@ -62,7 +51,6 @@ JB.REGIONS = [
 JB.DATA = {};
 JB.registerRegion = function (key, payload) {
   payload.schools = payload.schools || [];
-  payload.resources = payload.resources || [];
   JB.DATA[key] = payload;
 };
 

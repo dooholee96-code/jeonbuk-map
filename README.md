@@ -102,9 +102,6 @@
 
 원본 순창 지도의 `ox/oy` 25건과 남원 지도의 8방향 배치 39건은 그대로 계승했습니다.
 
-체험자원(`resources`)은 아직 비어 있습니다. `{ n, cat, lat, lng, desc, tags }` 형식이고
-`cat` 은 `farm` `nature` `history` `art` `sports` `stay` 중 하나입니다(`config.js` 참고).
-
 ## 카카오 앱 키
 
 `assets/js/config.js` 의 `JB.KAKAO_KEY`. 지도 표시는 대부분 환경에서 되지만,
