@@ -554,7 +554,33 @@
     });
   }
 
+  /* SDK 로드 실패는 대부분 "이 도메인이 카카오 앱에 등록되지 않음"이다.
+     등록해야 할 주소를 화면에 그대로 찍어 준다. */
+  function showSdkError() {
+    var origin = location.origin;
+    var isFile = location.protocol === 'file:';
+    $('#map').innerHTML =
+      '<div class="fatal">' +
+        '<h3>카카오맵을 불러오지 못했습니다</h3>' +
+        (isFile
+          ? '<p>파일을 직접 연 상태(<code>file://</code>)라 카카오 SDK가 차단되었습니다.<br>' +
+            '폴더에서 <code>python -m http.server 8000</code> 을 실행하고 ' +
+            '<code>http://localhost:8000</code> 으로 여세요.</p>'
+          : '<p>이 사이트 주소가 카카오 앱 키에 등록되어 있지 않습니다.<br>' +
+            '아래 주소를 <b>그대로</b> 등록하세요.</p>' +
+            '<p class="origin">' + esc(origin) + '</p>' +
+            '<ol>' +
+              '<li><a href="https://developers.kakao.com/console/app" target="_blank" rel="noopener">developers.kakao.com</a> 로그인</li>' +
+              '<li>내 애플리케이션 → 해당 앱 선택</li>' +
+              '<li>앱 설정 → <b>플랫폼</b> → Web → <b>사이트 도메인 등록</b></li>' +
+              '<li>위 주소를 붙여넣고 저장 (끝에 <code>/</code> 나 경로는 빼세요)</li>' +
+              '<li>이 페이지를 강력 새로고침 (Ctrl+Shift+R / ⌘+Shift+R)</li>' +
+            '</ol>') +
+        '<p class="hint">앱 키: <code>' + esc(String(JB.KAKAO_KEY).slice(0, 8)) + '…</code> ' +
+          '— 다른 앱의 키를 쓰고 있다면 <code>assets/js/config.js</code> 에서 바꾸세요.</p>' +
+      '</div>';
+  }
+
   if (window.kakao && window.kakao.maps) kakao.maps.load(init);
-  else document.getElementById('map').innerHTML =
-    '<div class="fatal">카카오맵 SDK를 불러오지 못했습니다. 네트워크 또는 앱 키 도메인 설정을 확인하세요.</div>';
+  else showSdkError();
 })();
