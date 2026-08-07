@@ -576,9 +576,36 @@
               '<li>위 주소를 붙여넣고 저장 (끝에 <code>/</code> 나 경로는 빼세요)</li>' +
               '<li>이 페이지를 강력 새로고침 (Ctrl+Shift+R / ⌘+Shift+R)</li>' +
             '</ol>') +
-        '<p class="hint">앱 키: <code>' + esc(String(JB.KAKAO_KEY).slice(0, 8)) + '…</code> ' +
-          '— 다른 앱의 키를 쓰고 있다면 <code>assets/js/config.js</code> 에서 바꾸세요.</p>' +
+        '<div class="keybox">' +
+          '<label for="keyInput">다른 앱 키로 바로 시험해 보기 — JavaScript 키를 붙여넣으세요</label>' +
+          '<div class="keyrow">' +
+            '<input id="keyInput" type="text" spellcheck="false" placeholder="예) 0123456789abcdef0123456789abcdef">' +
+            '<button class="btn primary" id="keyApply">적용</button>' +
+          '</div>' +
+          '<p class="hint">현재 키 <code>' + esc(String(JB.KAKAO_KEY).slice(0, 8)) + '…</code>' +
+            (JB.KEY_IS_OVERRIDE
+              ? ' (이 브라우저에만 저장된 키) · <a href="#" id="keyReset">기본 키로 되돌리기</a>'
+              : ' (파일에 들어 있는 기본 키)') +
+            '<br>이 화면에서 넣은 키는 이 브라우저에만 저장됩니다. ' +
+            '모두에게 적용하려면 <code>assets/js/config.js</code> 의 ' +
+            '<code>JB.DEFAULT_KAKAO_KEY</code> 를 바꾸세요.</p>' +
+        '</div>' +
       '</div>';
+
+    $('#keyApply').onclick = function () {
+      var v = ($('#keyInput').value || '').trim();
+      if (!/^[0-9a-f]{32}$/i.test(v)) {
+        return alert('JavaScript 키 형식이 아닙니다.\n' +
+          '카카오 개발자센터 → 앱 설정 → 앱 키 의 "JavaScript 키"(영문·숫자 32자)를 넣어 주세요.\n' +
+          'REST API 키나 Admin 키는 지도에 쓸 수 없습니다.');
+      }
+      JB.setKakaoKey(v);
+      location.replace(location.pathname);
+    };
+    $('#keyInput').onkeydown = function (e) { if (e.key === 'Enter') $('#keyApply').click(); };
+    if ($('#keyReset')) $('#keyReset').onclick = function (e) {
+      e.preventDefault(); JB.setKakaoKey(null); location.replace(location.pathname);
+    };
   }
 
   if (window.kakao && window.kakao.maps) kakao.maps.load(init);

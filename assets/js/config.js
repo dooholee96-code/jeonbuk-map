@@ -3,8 +3,30 @@ window.JB = window.JB || {};
 
 /* 카카오맵 JavaScript 앱 키.
    내 도메인에서 쓰려면 https://developers.kakao.com 에서
-   [내 애플리케이션 > 플랫폼 > Web]에 사이트 도메인을 등록해야 합니다. */
-JB.KAKAO_KEY = 'ee00ac93b075fc1e56de1a0dc90ccaf3';
+   [내 애플리케이션 > 플랫폼 > Web]에 사이트 도메인을 등록해야 합니다.
+
+   파일을 고치지 않고도 다른 키로 시험해 볼 수 있습니다.
+     - 주소 뒤에 ?key=<JavaScript 키> 를 붙이거나
+     - 지도가 안 뜰 때 나오는 안내 화면에서 키를 붙여넣으면
+   브라우저에 저장되어 이후 방문에도 그 키를 씁니다. */
+JB.DEFAULT_KAKAO_KEY = 'ee00ac93b075fc1e56de1a0dc90ccaf3';
+JB.KEY_STORE = 'jb.kakaoKey';
+
+JB.setKakaoKey = function (k) {
+  try {
+    if (k) localStorage.setItem(JB.KEY_STORE, k);
+    else localStorage.removeItem(JB.KEY_STORE);
+  } catch (e) { /* 사생활 보호 모드 등 */ }
+};
+
+JB.KAKAO_KEY = (function () {
+  var q = null;
+  try { q = new URLSearchParams(location.search).get('key'); } catch (e) { /* 구형 브라우저 */ }
+  if (q) { JB.setKakaoKey(q); return q; }
+  try { return localStorage.getItem(JB.KEY_STORE) || JB.DEFAULT_KAKAO_KEY; }
+  catch (e) { return JB.DEFAULT_KAKAO_KEY; }
+})();
+JB.KEY_IS_OVERRIDE = JB.KAKAO_KEY !== JB.DEFAULT_KAKAO_KEY;
 
 /* 학교급 정의 */
 JB.TYPES = {

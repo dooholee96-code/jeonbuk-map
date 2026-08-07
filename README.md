@@ -102,11 +102,37 @@
 
 원본 순창 지도의 `ox/oy` 25건과 남원 지도의 8방향 배치 39건은 그대로 계승했습니다.
 
-## 카카오 앱 키
+## 카카오 앱 키와 도메인 등록
 
-`assets/js/config.js` 의 `JB.KAKAO_KEY`. 지도 표시는 대부분 환경에서 되지만,
-**장소검색(좌표 보정)** 은 [카카오 개발자센터](https://developers.kakao.com) →
-내 애플리케이션 → 플랫폼 → Web 에 배포 도메인(및 `http://localhost:포트`)을 등록해야 동작합니다.
+지도가 안 뜨는 원인은 거의 항상 **도메인 미등록**입니다. 앱 키 자체는 브라우저에
+노출되는 게 정상이고, 보안은 "등록된 도메인에서만 동작"으로 지킵니다.
+
+[카카오 개발자센터](https://developers.kakao.com/console/app) → 내 애플리케이션 → 앱 선택 →
+**앱 설정 → 플랫폼 → Web → 사이트 도메인 등록** 에 배포 주소를 **오리진 단위로** 넣습니다.
+
+```
+https://<사용자>.github.io      ← 맞음 (프로토콜 포함, 경로 없음)
+https://<사용자>.github.io/<저장소>/   ← 틀림 (경로가 붙으면 안 됩니다)
+<사용자>.github.io              ← 틀림 (https:// 가 빠지면 안 됩니다)
+```
+
+로컬 테스트용으로 `http://localhost:8000` 도 함께 등록해 두면 편합니다(최대 10개).
+저장 후 **강력 새로고침**(Ctrl+Shift+R / ⌘+Shift+R) 해야 반영됩니다.
+
+### 키 바꾸기
+
+지도가 안 뜰 때 나오는 안내 화면에 **키 입력칸**이 있습니다. JavaScript 키(영문·숫자 32자)를
+붙여넣고 [적용]하면 그 브라우저에만 저장되어 바로 시험해 볼 수 있습니다.
+주소 뒤에 `?key=<키>` 를 붙여도 같습니다. 원래대로는 안내 화면의 [기본 키로 되돌리기].
+
+모두에게 적용하려면 `assets/js/config.js` 의 `JB.DEFAULT_KAKAO_KEY` 를 바꾸세요.
+REST API 키·Admin 키가 아니라 반드시 **JavaScript 키**여야 합니다.
+
+## GitHub Pages 배포
+
+저장소가 public 이어야 합니다(private 은 유료 플랜). Settings → Pages →
+Source `Deploy from a branch`, Branch `main` / `/ (root)` → Save.
+빌드 과정이 없는 정적 파일이라 그대로 서비스되며, Jekyll 처리를 끄려고 `.nojekyll` 을 넣어 뒀습니다.
 
 ## 경계 데이터
 
