@@ -146,18 +146,21 @@ window.JB = window.JB || {};
     lines.push("  updated: '" + new Date().toISOString().slice(0, 10) + "',");
     lines.push('  verified: ' + (data.schools.every(function (s) { return !s.approx; }) ? 'true' : 'false') + ',');
     lines.push('  note: ' + JSON.stringify(data.note || ''), '  schools: [');
+    // 앞으로 필드가 늘어도 빠지지 않도록, 내부용(_로 시작)만 빼고 전부 내보낸다
+    var ORDER = ['n', 't', 'ph', 'rural', 'hope2', 'lat', 'lng', 'approx', 'branch',
+                 'addr', 'tel', 'stu', 'cls', 'ox', 'oy', 'lock', 'dir', 'tags', 'desc'];
+    var TRANSIENT = { outside: 1, inexact: 1, geoFailed: 1 };   // 실행 중에만 쓰는 표시
     data.schools.forEach(function (s, idx) {
-      var o = { n: s.n, t: s.t };
-      if (s.ph) o.ph = s.ph;
-      if (s.rural) o.rural = s.rural;
-      o.lat = Number(s.lat.toFixed(7));
-      o.lng = Number(s.lng.toFixed(7));
-      if (s.approx) o.approx = true;
-      if (s.addr) o.addr = s.addr;
-      if (s.tel) o.tel = s.tel;
-      if (typeof s.ox === 'number') { o.ox = s.ox; o.oy = s.oy; }
-      if (s.tags && s.tags.length) o.tags = s.tags;
-      if (s.desc) o.desc = s.desc;
+      var o = {};
+      ORDER.forEach(function (k) {
+        if (s[k] === undefined || s[k] === null || s[k] === false) return;
+        o[k] = (k === 'lat' || k === 'lng') ? Number(s[k].toFixed(7)) : s[k];
+      });
+      Object.keys(s).forEach(function (k) {                      // 목록에 없는 새 필드도 살린다
+        if (k.charAt(0) === '_' || TRANSIENT[k] || k in o) return;
+        if (s[k] === undefined || s[k] === null || s[k] === false) return;
+        o[k] = s[k];
+      });
       lines.push('    ' + JSON.stringify(o) + (idx < data.schools.length - 1 ? ',' : ''));
     });
     lines.push('  ]');
