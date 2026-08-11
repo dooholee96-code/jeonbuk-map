@@ -1,4 +1,4 @@
-/* 전북 농촌유학·학교 통합지도 — 메인 앱 */
+/* 전북 학교·농촌유학 지도 — 메인 앱 (Leaflet + OpenStreetMap) */
 (function () {
   'use strict';
 
@@ -20,20 +20,29 @@
      초기화
      ══════════════════════════════════════════════════════════ */
   function init() {
-    map = new kakao.maps.Map($('#map'), {
-      center: new kakao.maps.LatLng(35.75, 127.15),
-      level: 12
+    map = L.map('map', {
+      center: [35.75, 127.15], zoom: 9, minZoom: 7, maxZoom: 18,
+      zoomControl: true, attributionControl: true,
+      worldCopyJump: false
     });
-    map.setMaxLevel(13);
+    L.tileLayer(JB.TILE.url, {
+      attribution: JB.TILE.attribution,
+      maxZoom: JB.TILE.maxZoom,
+      className: JB.TILE_GRAYSCALE ? 'jb-tiles-gray' : ''
+    }).addTo(map);
+
+    // 라벨은 마커 위, 지시선은 마커 아래로 그리기 위한 전용 레이어
+    map.createPane('jbLines').style.zIndex = 610;
+    map.createPane('jbDots').style.zIndex = 620;
+    map.createPane('jbLabels').style.zIndex = 630;
+    map.getPane('jbLines').style.pointerEvents = 'none';
 
     buildRegionSelect();
     bindControls();
     trackHeaderHeight();
     if (window.innerWidth <= 860) $('#legend').removeAttribute('open');   // 좁은 화면에선 범례를 접어둔다
 
-    ['idle', 'zoom_changed'].forEach(function (ev) {
-      kakao.maps.event.addListener(map, ev, scheduleRelayout);
-    });
+    map.on('moveend zoomend resize', scheduleRelayout);
     window.addEventListener('resize', scheduleRelayout);
 
     var fromHash = (location.hash || '').replace('#', '');
@@ -106,75 +115,58 @@
   /* ══════════════════════════════════════════════════════════
      경계 마스킹 / 외곽선
      ══════════════════════════════════════════════════════════ */
-  /* SDK 로드 이후에만 LatLng 을 만들 수 있으므로 지연 생성한다 */
-  function worldRect() {
-    return [
-      new kakao.maps.LatLng(40, 120), new kakao.maps.LatLng(40, 135),
-      new kakao.maps.LatLng(32, 135), new kakao.maps.LatLng(32, 120)
-    ];
-  }
+  var WORLD_RECT = [[40, 118], [40, 137], [31, 137], [31, 118]];
 
+  /* GeoJSON 링([lng,lat])을 Leaflet 순서([lat,lng])로 */
   function ringToPath(ring) {
-    return ring.map(function (c) { return new kakao.maps.LatLng(c[1], c[0]); });
+    return ring.map(function (c) { return [c[1], c[0]]; });
   }
 
   function drawBoundary() {
-    if (maskPolygon) { maskPolygon.setMap(null); maskPolygon = null; }
-    outlinePolys.forEach(function (p) { p.setMap(null); });
+    if (maskPolygon) { map.removeLayer(maskPolygon); maskPolygon = null; }
+    outlinePolys.forEach(function (p) { map.removeLayer(p); });
     outlinePolys = [];
 
     if (!state.region) {
-      // 전체 보기: 14개 시군 외곽선만
+      // 전북 전체: 14개 시군 외곽선만 옅게
       JB.REGIONS.forEach(function (r) {
-        var polys = JB.BOUNDARIES[r.name] || [];
-        polys.forEach(function (p) {
-          var poly = new kakao.maps.Polygon({
-            path: ringToPath(p[0]),
-            strokeWeight: 1.6, strokeColor: '#94a3b8', strokeOpacity: 0.9,
+        (JB.BOUNDARIES[r.name] || []).forEach(function (p) {
+          outlinePolys.push(L.polygon(ringToPath(p[0]), {
+            interactive: false,
+            weight: 1.4, color: '#64748b', opacity: 0.85,
             fillColor: JB.DATA[r.key] ? '#22c55e' : '#cbd5e1',
-            fillOpacity: JB.DATA[r.key] ? 0.10 : 0.06
-          });
-          poly.setMap(map);
-          outlinePolys.push(poly);
+            fillOpacity: JB.DATA[r.key] ? 0.08 : 0.04
+          }).addTo(map));
         });
       });
       return;
     }
 
+    // 시군 선택: 바깥을 흰색으로 덮고 해당 시군만 뚫는다 (Leaflet 은 첫 링이 외곽, 나머지가 구멍)
     var region = JB.regionByKey(state.region);
-    var polys = JB.BOUNDARIES[region.name] || [];
-    var holes = polys.map(function (p) { return ringToPath(p[0]); });
+    var holes = (JB.BOUNDARIES[region.name] || []).map(function (p) { return ringToPath(p[0]); });
 
-    maskPolygon = new kakao.maps.Polygon({
-      path: [worldRect()].concat(holes),
-      fillColor: '#ffffff', fillOpacity: 0.82,
-      strokeWeight: 0
-    });
-    maskPolygon.setMap(map);
+    maskPolygon = L.polygon([WORLD_RECT].concat(holes), {
+      interactive: false, stroke: false, fillColor: '#ffffff', fillOpacity: 0.78
+    }).addTo(map);
 
     holes.forEach(function (h) {
-      var poly = new kakao.maps.Polygon({
-        path: h, strokeWeight: 3, strokeColor: '#475569', strokeOpacity: 0.85,
-        fillOpacity: 0
-      });
-      poly.setMap(map);
-      outlinePolys.push(poly);
+      outlinePolys.push(L.polygon(h, {
+        interactive: false, weight: 2.5, color: '#475569', opacity: 0.85, fill: false
+      }).addTo(map));
     });
   }
 
   function fitRegion() {
-    if (!state.region) {
-      map.setCenter(new kakao.maps.LatLng(35.75, 127.15));
-      map.setLevel(11);
-      return;
-    }
-    var region = JB.regionByKey(state.region);
-    var polys = JB.BOUNDARIES[region.name] || [];
-    var b = new kakao.maps.LatLngBounds();
-    polys.forEach(function (p) {
-      p[0].forEach(function (c) { b.extend(new kakao.maps.LatLng(c[1], c[0])); });
+    var names = state.region ? [JB.regionByKey(state.region).name]
+                             : JB.REGIONS.map(function (r) { return r.name; });
+    var pts = [];
+    names.forEach(function (nm) {
+      (JB.BOUNDARIES[nm] || []).forEach(function (p) {
+        p[0].forEach(function (c) { pts.push([c[1], c[0]]); });
+      });
     });
-    if (!b.isEmpty()) map.setBounds(b, 40, 40, 40, 40);
+    if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [30, 30] });
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -214,9 +206,22 @@
      지도 렌더링
      ══════════════════════════════════════════════════════════ */
   function clearOverlays() {
-    overlays.forEach(function (o) { o.setMap(null); });
+    overlays.forEach(function (o) { map.removeLayer(o); });
     overlays = [];
     items = [];
+  }
+
+  /* 크기 0인 divIcon 마커 위에 내용을 올린다.
+     Leaflet 이 좌표 갱신과 줌 애니메이션을 처리해 주므로 위치 계산이 필요 없다. */
+  function pointOverlay(latlng, el, pane, interactive) {
+    var m = L.marker(latlng, {
+      pane: pane,
+      interactive: !!interactive,
+      keyboard: false,
+      icon: L.divIcon({ className: 'jb-ov', html: '', iconSize: [0, 0], iconAnchor: [0, 0] })
+    });
+    m.on('add', function () { m.getElement().appendChild(el); });
+    return m;
   }
 
   function render() {
@@ -226,7 +231,7 @@
     schools.forEach(function (s) {
       if (typeof s.lat !== 'number' || typeof s.lng !== 'number') return;
       var st = styleOf(s);
-      var pos = new kakao.maps.LatLng(s.lat, s.lng);
+      var pos = L.latLng(s.lat, s.lng);
 
       var lineEl = document.createElement('div');
       lineEl.className = 'ov-line';
@@ -234,7 +239,7 @@
         '" stroke-width="' + (st.boxed ? 3.5 : 2.2) + '"/></svg>';
 
       var dotEl = document.createElement('div');
-      dotEl.className = 'marker-dot dot-' + st.cls + (s.approx ? ' is-approx' : '') + (s.outside ? ' is-outside' : '');
+      dotEl.className = 'marker-dot dot-' + st.cls + (s.approx ? ' is-approx' : '');
       dotEl.title = s.n + (s.approx ? ' (좌표 미확정)' : '');
 
       var labelEl = document.createElement('div');
@@ -245,10 +250,10 @@
         el.addEventListener('click', function (e) { e.stopPropagation(); selectSchool(s); });
       });
 
-      var line = new kakao.maps.CustomOverlay({ position: pos, content: lineEl, zIndex: 5, xAnchor: 0.5, yAnchor: 0.5 });
-      var dot = new kakao.maps.CustomOverlay({ position: pos, content: dotEl, zIndex: 10, xAnchor: 0.5, yAnchor: 0.5 });
-      var label = new kakao.maps.CustomOverlay({ position: pos, content: labelEl, zIndex: 20, xAnchor: 0.5, yAnchor: 0.5 });
-      [line, dot, label].forEach(function (o) { o.setMap(map); overlays.push(o); });
+      [pointOverlay(pos, lineEl, 'jbLines', false),
+       pointOverlay(pos, dotEl, 'jbDots', true),
+       pointOverlay(pos, labelEl, 'jbLabels', true)
+      ].forEach(function (o) { o.addTo(map); overlays.push(o); });
 
       items.push({
         school: s, pos: pos, style: st,
@@ -297,14 +302,13 @@
 
   function relayout() {
     if (!items.length) return;
-    var proj = map.getProjection();
     var el = $('#map');
     var view = { w: el.clientWidth, h: el.clientHeight };
     var margin = 140;
 
     var visible = [];
     items.forEach(function (it) {
-      var p = proj.containerPointFromCoords(it.pos);
+      var p = map.latLngToContainerPoint(it.pos);
       it.x = p.x; it.y = p.y;
       var mode = state.labelMode;
       if (mode === 'auto') mode = state.region ? 'all' : 'rural';   // 전북 전체에선 농촌유학만
@@ -326,7 +330,7 @@
         return;
       }
       it.labelEl.style.display = '';
-      it.labelEl.style.transform = 'translate(' + it.ox + 'px,' + it.oy + 'px)';
+      it.labelEl.style.transform = 'translate(-50%,-50%) translate(' + it.ox + 'px,' + it.oy + 'px)';
 
       var d = Math.hypot(it.ox, it.oy);
       if (d < 26) { it.lineEl.style.display = 'none'; return; }
@@ -364,7 +368,7 @@
         stat(op, '농촌유학 운영', 'op') +
         stat(hope, '희망', 'hope') +
       '</div>' +
-      (approx ? '<div class="warn">좌표 미확정 ' + approx + '개 — 상단 <b>좌표 보정</b> 참고</div>' : '') +
+      (approx ? '<div class="warn">좌표 미확정 ' + approx + '개 — 데이터 파일의 <code>lat/lng</code> 를 확인하세요.</div>' : '') +
       (d && d.note && !d.verified ? '<details class="note"><summary>데이터 출처·주의</summary><p>' + d.note + '</p></details>' : '');
 
     function stat(v, label, cls) {
@@ -404,8 +408,7 @@
       var s = (JB.DATA[row.dataset.region].schools || []).filter(function (x) { return x.n === row.dataset.name; })[0];
       if (!s) return;
       selectSchool(s);
-      map.setCenter(new kakao.maps.LatLng(s.lat, s.lng));
-      if (!state.region) map.setLevel(Math.min(map.getLevel(), 7));
+      map.setView([s.lat, s.lng], Math.max(map.getZoom(), state.region ? 12 : 11));
     };
   }
 
@@ -449,49 +452,12 @@
       (s.tags && s.tags.length ? '<div class="d-tags">' + s.tags.map(function (t) { return '<span>#' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
       (s.desc ? '<p class="d-desc">' + esc(s.desc) + '</p>' : '') +
       '<p class="d-coord">' + s.lat.toFixed(6) + ', ' + s.lng.toFixed(6) +
-        (s.approx ? ' <em class="warn-inline">읍·면 중심 임시 좌표</em>' : '') +
-        (s.outside ? ' <em class="warn-inline">시군 경계 밖 — 소속 확인 필요</em>' : '') +
-        (s.inexact ? ' <em class="warn-inline">검색 결과 이름 불일치</em>' : '') + '</p>' +
-      '<div class="d-actions">' +
-        '<button class="btn small" id="pickOnMap">지도에서 위치 지정</button>' +
-      '</div>';
+        (s.approx ? ' <em class="warn-inline">좌표 미확정</em>' : '') + '</p>';
 
     panel.querySelector('.close').onclick = function () {
       panel.classList.remove('open'); state.selected = null; scheduleRelayout();
     };
-    panel.querySelector('#pickOnMap').onclick = function () { startPick(s); };
     scheduleRelayout();
-  }
-
-  /* 지도 클릭으로 좌표 직접 지정 (카카오 검색이 막힌 환경에서도 쓸 수 있는 수단) */
-  var pickHandler = null;
-  function startPick(s) {
-    $('#toast').textContent = '“' + s.n + '”의 실제 위치를 지도에서 클릭하세요. (ESC 취소)';
-    $('#toast').classList.add('show');
-    $('#map').classList.add('picking');
-
-    function finish() {
-      kakao.maps.event.removeListener(map, 'click', pickHandler);
-      document.removeEventListener('keydown', onKey);
-      $('#map').classList.remove('picking');
-      $('#toast').classList.remove('show');
-      pickHandler = null;
-    }
-    function onKey(e) { if (e.key === 'Escape') finish(); }
-
-    pickHandler = function (e) {
-      var ll = e.latLng;
-      s.lat = ll.getLat();
-      s.lng = ll.getLng();
-      s.approx = false;
-      s.outside = !JB.insideRegion(JB.regionByKey(s._region).name, s.lat, s.lng);
-      JB.cacheSet(s._region, s.n, { ok: true, lat: s.lat, lng: s.lng, addr: s.addr || '', exact: true, outside: s.outside });
-      finish();
-      render();
-      selectSchool(s);
-    };
-    kakao.maps.event.addListener(map, 'click', pickHandler);
-    document.addEventListener('keydown', onKey);
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -507,44 +473,13 @@
       t = setTimeout(function () { state.query = e.target.value; render(); }, 200);
     };
 
-    $('#btnGeocode').onclick = runGeocode;
-    $('#btnExport').onclick = function () {
-      if (!state.region) return alert('시군을 먼저 선택하세요.');
-      JB.download(state.region + '.js', JB.exportRegion(state.region));
-    };
-    $('#btnResetCache').onclick = function () {
-      if (!confirm('저장된 좌표 보정 결과를 지울까요? (원본 데이터 파일은 그대로입니다)')) return;
-      JB.cacheClear(state.region);
-      location.reload();
-    };
     $('#btnFit').onclick = fitRegion;
     $('#panelToggle').onclick = function () { document.body.classList.toggle('panel-collapsed'); };
 
-    kakao.maps.event.addListener(map, 'click', function () {
-      if (!pickHandler) { $('#detail').classList.remove('open'); state.selected = null; scheduleRelayout(); }
-    });
-  }
-
-  function runGeocode() {
-    if (!state.region) return alert('시군을 먼저 선택하세요.');
-    if (!(window.kakao && kakao.maps.services)) {
-      return alert('카카오 장소검색(services)을 불러오지 못했습니다.\n' +
-        '앱 키의 웹 플랫폼 도메인 등록을 확인하거나, 각 학교 상세에서 [지도에서 위치 지정]으로 직접 찍어주세요.');
-    }
-    var btn = $('#btnGeocode');
-    btn.disabled = true;
-    JB.geocodeRegion(state.region, function (done, total, name) {
-      btn.textContent = '보정 중 ' + done + '/' + total + ' · ' + name;
-    }).then(function (res) {
-      btn.disabled = false;
-      btn.textContent = '좌표 보정';
-      render();
-      var msg = '보정 완료: ' + res.fixed + '/' + res.done + '개';
-      if (res.failed.length) msg += '\n실패: ' + res.failed.map(function (f) { return f.n; }).join(', ');
-      var outside = JB.DATA[state.region].schools.filter(function (s) { return s.outside; });
-      if (outside.length) msg += '\n경계 밖으로 찍힌 학교(소속 확인 필요): ' + outside.map(function (s) { return s.n; }).join(', ');
-      msg += '\n\n결과가 맞으면 [데이터 내보내기]로 data/regions/' + state.region + '.js 를 교체하세요.';
-      alert(msg);
+    map.on('click', function () {
+      $('#detail').classList.remove('open');
+      state.selected = null;
+      scheduleRelayout();
     });
   }
 
@@ -554,60 +489,9 @@
     });
   }
 
-  /* SDK 로드 실패는 대부분 "이 도메인이 카카오 앱에 등록되지 않음"이다.
-     등록해야 할 주소를 화면에 그대로 찍어 준다. */
-  function showSdkError() {
-    var origin = location.origin;
-    var isFile = location.protocol === 'file:';
-    $('#map').innerHTML =
-      '<div class="fatal">' +
-        '<h3>카카오맵을 불러오지 못했습니다</h3>' +
-        (isFile
-          ? '<p>파일을 직접 연 상태(<code>file://</code>)라 카카오 SDK가 차단되었습니다.<br>' +
-            '폴더에서 <code>python -m http.server 8000</code> 을 실행하고 ' +
-            '<code>http://localhost:8000</code> 으로 여세요.</p>'
-          : '<p>이 사이트 주소가 카카오 앱 키에 등록되어 있지 않습니다.<br>' +
-            '아래 주소를 <b>그대로</b> 등록하세요.</p>' +
-            '<p class="origin">' + esc(origin) + '</p>' +
-            '<ol>' +
-              '<li><a href="https://developers.kakao.com/console/app" target="_blank" rel="noopener">developers.kakao.com</a> 로그인</li>' +
-              '<li>내 애플리케이션 → 해당 앱 선택</li>' +
-              '<li>앱 설정 → <b>플랫폼</b> → Web → <b>사이트 도메인 등록</b></li>' +
-              '<li>위 주소를 붙여넣고 저장 (끝에 <code>/</code> 나 경로는 빼세요)</li>' +
-              '<li>이 페이지를 강력 새로고침 (Ctrl+Shift+R / ⌘+Shift+R)</li>' +
-            '</ol>') +
-        '<div class="keybox">' +
-          '<label for="keyInput">다른 앱 키로 바로 시험해 보기 — JavaScript 키를 붙여넣으세요</label>' +
-          '<div class="keyrow">' +
-            '<input id="keyInput" type="text" spellcheck="false" placeholder="예) 0123456789abcdef0123456789abcdef">' +
-            '<button class="btn primary" id="keyApply">적용</button>' +
-          '</div>' +
-          '<p class="hint">현재 키 <code>' + esc(String(JB.KAKAO_KEY).slice(0, 8)) + '…</code>' +
-            (JB.KEY_IS_OVERRIDE
-              ? ' (이 브라우저에만 저장된 키) · <a href="#" id="keyReset">기본 키로 되돌리기</a>'
-              : ' (파일에 들어 있는 기본 키)') +
-            '<br>이 화면에서 넣은 키는 이 브라우저에만 저장됩니다. ' +
-            '모두에게 적용하려면 <code>assets/js/config.js</code> 의 ' +
-            '<code>JB.DEFAULT_KAKAO_KEY</code> 를 바꾸세요.</p>' +
-        '</div>' +
-      '</div>';
-
-    $('#keyApply').onclick = function () {
-      var v = ($('#keyInput').value || '').trim();
-      if (!/^[0-9a-f]{32}$/i.test(v)) {
-        return alert('JavaScript 키 형식이 아닙니다.\n' +
-          '카카오 개발자센터 → 앱 설정 → 앱 키 의 "JavaScript 키"(영문·숫자 32자)를 넣어 주세요.\n' +
-          'REST API 키나 Admin 키는 지도에 쓸 수 없습니다.');
-      }
-      JB.setKakaoKey(v);
-      location.replace(location.pathname);
-    };
-    $('#keyInput').onkeydown = function (e) { if (e.key === 'Enter') $('#keyApply').click(); };
-    if ($('#keyReset')) $('#keyReset').onclick = function (e) {
-      e.preventDefault(); JB.setKakaoKey(null); location.replace(location.pathname);
-    };
-  }
-
-  if (window.kakao && window.kakao.maps) kakao.maps.load(init);
-  else showSdkError();
+  if (window.L && L.map) init();
+  else document.getElementById('map').innerHTML =
+    '<div class="fatal"><h3>지도 라이브러리를 불러오지 못했습니다</h3>' +
+    '<p><code>assets/vendor/leaflet/leaflet.js</code> 파일이 있는지 확인하세요. ' +
+    '폴더 구조를 그대로 두고 <code>index.html</code> 을 열어야 합니다.</p></div>';
 })();

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>전북 농촌유학·학교 통합지도</title>
 <meta name="description" content="전북특별자치도 14개 시군의 초·중·고등학교와 농촌유학 운영·희망학교를 한 지도에서 봅니다.">
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="assets/css/app.css">
 </head>
 <body>
@@ -25,9 +26,6 @@
         </select>
       </label>
       <button class="btn" id="btnFit">지역 맞춤</button>
-      <button class="btn" id="btnGeocode" title="좌표 미확정 학교를 카카오 장소검색으로 실제 위치에 맞춥니다">좌표 보정</button>
-      <button class="btn primary" id="btnExport" title="보정 결과를 data/regions/&lt;시군&gt;.js 형식으로 내려받습니다">데이터 내보내기</button>
-      <button class="btn" id="btnResetCache" title="브라우저에 저장된 보정 결과 삭제">초기화</button>
     </div>
   </div>
 </header>
@@ -78,9 +76,11 @@
       <div class="lg"><i style="background:#94a3b8;border-style:dashed"></i> 좌표 미확정</div>
     </details>
 
-    <div id="toast"></div>
   </div>
 </div>
+
+<!-- 지도 라이브러리 (저장소에 동봉 — CDN·API 키 불필요) -->
+<script src="assets/vendor/leaflet/leaflet.js"></script>
 
 <!-- 데이터 (외부 요청 없이 로컬 파일만으로 동작하도록 .js 로 제공) -->
 <script src="assets/js/config.js"></script>
@@ -102,14 +102,7 @@
 <script src="data/regions/iksan.js"></script>
 <script src="data/regions/gunsan.js"></script>
 
-<!-- 카카오맵 SDK (services = 장소·주소 검색) -->
-<script>
-  document.write('<scr' + 'ipt src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=' +
-    JB.KAKAO_KEY + '&libraries=services&autoload=false"></scr' + 'ipt>');
-</script>
-
 <script src="assets/js/labels.js"></script>
-<script src="assets/js/geocode.js"></script>
 <script src="assets/js/app.js"></script>
 </body>
 </html>
