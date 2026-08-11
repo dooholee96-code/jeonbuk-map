@@ -40,6 +40,7 @@
     buildRegionSelect();
     bindControls();
     trackHeaderHeight();
+    initSheet();
     if (window.innerWidth <= 860) $('#legend').removeAttribute('open');   // 좁은 화면에선 범례를 접어둔다
 
     map.on('moveend zoomend resize', scheduleRelayout);
@@ -59,6 +60,115 @@
     apply();
     if (window.ResizeObserver) new ResizeObserver(apply).observe(header);
     else window.addEventListener('resize', apply);
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     모바일 바텀시트 — 목록을 지도 위로 끌어올려 본다
+     peek(요약만) ↔ half(기본) ↔ full(목록 위주) 3단계.
+     핸들을 끌면 따라오고, 놓으면 가까운 단계로 붙는다. 톡 치면 다음 단계.
+     ══════════════════════════════════════════════════════════ */
+  var sheet = { state: 'half', y: 0, dragging: false };
+  var mqMobile = window.matchMedia('(max-width: 860px)');
+
+  function sheetHeight() { return $('#panel').offsetHeight || window.innerHeight; }
+
+  function snapY(state) {
+    var h = sheetHeight();
+    if (state === 'full') return 4;
+    if (state === 'half') return Math.round(h * 0.42);
+    return Math.max(0, h - 84);          // peek: 핸들 + 요약 한 줄만 남긴다
+  }
+
+  function applySheet(state, animate) {
+    sheet.state = state;
+    sheet.y = snapY(state);
+    document.body.classList.toggle('sheet-dragging', animate === false);
+    $('#panel').style.setProperty('--sheet-y', sheet.y + 'px');
+    if (animate === false) requestAnimationFrame(function () {
+      document.body.classList.remove('sheet-dragging');
+    });
+    scheduleRelayout();
+  }
+
+  function initSheet() {
+    var handle = $('#sheetHandle');
+    var panel = $('#panel');
+    if (!handle) return;
+
+    function sync() {
+      if (mqMobile.matches) applySheet(sheet.state, false);
+      else panel.style.removeProperty('--sheet-y');
+    }
+    sync();
+    (mqMobile.addEventListener ? mqMobile.addEventListener('change', sync)
+                               : mqMobile.addListener(sync));
+    window.addEventListener('resize', sync);
+
+    var startY = 0, startTop = 0, moved = 0;
+
+    handle.addEventListener('pointerdown', function (e) {
+      if (!mqMobile.matches) return;
+      sheet.dragging = true; moved = 0;
+      startY = e.clientY; startTop = sheet.y;
+      document.body.classList.add('sheet-dragging');
+      handle.setPointerCapture(e.pointerId);
+    });
+
+    handle.addEventListener('pointermove', function (e) {
+      if (!sheet.dragging) return;
+      var dy = e.clientY - startY;
+      moved = Math.max(moved, Math.abs(dy));
+      var h = sheetHeight();
+      sheet.y = Math.min(Math.max(4, startTop + dy), Math.max(0, h - 84));
+      panel.style.setProperty('--sheet-y', sheet.y + 'px');
+      e.preventDefault();
+    });
+
+    function end() {
+      if (!sheet.dragging) return;
+      sheet.dragging = false;
+      document.body.classList.remove('sheet-dragging');
+      if (moved < 6) {                       // 드래그가 아니라 탭 → 다음 단계로
+        var order = ['peek', 'half', 'full'];
+        applySheet(order[(order.indexOf(sheet.state) + 1) % order.length]);
+        return;
+      }
+      var best = 'half', bestD = Infinity;   // 가장 가까운 단계에 붙인다
+      ['peek', 'half', 'full'].forEach(function (st) {
+        var d = Math.abs(snapY(st) - sheet.y);
+        if (d < bestD) { bestD = d; best = st; }
+      });
+      applySheet(best);
+    }
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  }
+
+  /* 목록에서 학교를 고르면 지도를 봐야 하므로 시트를 접는다.
+     상세카드가 위를 덮으므로 half 로는 지도가 남지 않아 peek 까지 내린다.
+     목록 스크롤 위치는 그대로라 핸들을 올리면 보던 자리로 돌아온다. */
+  function collapseForMap() {
+    if (mqMobile.matches && sheet.state !== 'peek') applySheet('peek');
+  }
+
+  /* 시트가 지도 아래쪽을 덮고 있으므로, 그만큼을 여백으로 잡아야
+     시군 전체나 선택한 학교가 시트 뒤로 숨지 않는다. */
+  function sheetCover() {
+    if (!mqMobile.matches) return 0;
+    return Math.max(0, sheetHeight() - sheet.y);
+  }
+
+  function fitOptions() {
+    var c = sheetCover();
+    return c ? { paddingTopLeft: [20, 20], paddingBottomRight: [20, c + 16] }
+             : { padding: [30, 30] };
+  }
+
+  /* 좌표를 시트에 가리지 않는 영역의 한가운데로 */
+  function focusOn(lat, lng, zoom) {
+    map.setView([lat, lng], zoom);
+    var c = sheetCover();
+    if (c) map.panBy([0, c / 2], { animate: false });
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -166,7 +276,7 @@
         p[0].forEach(function (c) { pts.push([c[1], c[0]]); });
       });
     });
-    if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [30, 30] });
+    if (pts.length) map.fitBounds(L.latLngBounds(pts), fitOptions());
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -264,6 +374,7 @@
         lock: !!s.lock,
         mox: s.ox || 0, moy: s.oy || 0,   // 데이터에 적힌 수동 오프셋 (재배치해도 보존)
         ox: s.ox || 0, oy: s.oy || 0,
+        baseWeight: st.weight + (s.rural ? 50 : 0),
         weight: st.weight + (s.rural ? 50 : 0)
       });
     });
@@ -286,7 +397,7 @@
   /* 범례·상세카드가 덮고 있는 영역에는 라벨을 놓지 않는다 */
   function reservedZones(mapEl) {
     var base = mapEl.getBoundingClientRect();
-    return ['#legend', '#detail'].map(function (sel) {
+    return ['#legend', '#detail', mqMobile.matches ? '#panel' : null].filter(Boolean).map(function (sel) {
       var el = $(sel);
       if (!el || !el.offsetParent) return null;
       var r = el.getBoundingClientRect();
@@ -312,7 +423,9 @@
       it.x = p.x; it.y = p.y;
       var mode = state.labelMode;
       if (mode === 'auto') mode = state.region ? 'all' : 'rural';   // 전북 전체에선 농촌유학만
-      var showLabel = mode === 'all' || (mode === 'rural' && !!it.school.rural);
+      var isSel = it.school === state.selected;
+      var showLabel = isSel || mode === 'all' || (mode === 'rural' && !!it.school.rural);
+      it.weight = it.baseWeight + (isSel ? 1000 : 0);
       it.inView = p.x > -margin && p.y > -margin && p.x < view.w + margin && p.y < view.h + margin;
       if (it.inView && showLabel) visible.push(it);
       else {
@@ -407,8 +520,9 @@
       if (!row) return;
       var s = (JB.DATA[row.dataset.region].schools || []).filter(function (x) { return x.n === row.dataset.name; })[0];
       if (!s) return;
+      collapseForMap();
       selectSchool(s);
-      map.setView([s.lat, s.lng], Math.max(map.getZoom(), state.region ? 12 : 11));
+      focusOn(s.lat, s.lng, Math.max(map.getZoom(), state.region ? 12 : 11));
     };
   }
 
@@ -433,8 +547,16 @@
       '</li>';
   }
 
+  /* 선택한 학교가 지도의 어느 점인지 보이게 한다 */
+  function highlight(s) {
+    items.forEach(function (it) {
+      it.dotEl.classList.toggle('is-selected', it.school === s);
+    });
+  }
+
   function selectSchool(s) {
     state.selected = s;
+    highlight(s);
     var st = styleOf(s);
     var region = JB.regionByKey(s._region);
     var panel = $('#detail');
@@ -455,7 +577,7 @@
         (s.approx ? ' <em class="warn-inline">좌표 미확정</em>' : '') + '</p>';
 
     panel.querySelector('.close').onclick = function () {
-      panel.classList.remove('open'); state.selected = null; scheduleRelayout();
+      panel.classList.remove('open'); state.selected = null; highlight(null); scheduleRelayout();
     };
     scheduleRelayout();
   }
@@ -479,6 +601,7 @@
     map.on('click', function () {
       $('#detail').classList.remove('open');
       state.selected = null;
+      highlight(null);
       scheduleRelayout();
     });
   }
