@@ -2,20 +2,56 @@
 window.JB = window.JB || {};
 
 /* ── 배경지도 타일 ────────────────────────────────────────
-   OpenStreetMap 을 씁니다. API 키도, 도메인 등록도 필요 없습니다.
+   전부 API 키 없이 쓰는 타일입니다. 화면 오른쪽 위 [배경] 선택창에서
+   바꿔 볼 수 있고, 고른 값은 그 브라우저에 저장됩니다.
+   기본값을 바꾸려면 아래 JB.TILE_DEFAULT 를 고치세요.
 
-   OSM 공식 타일은 사용 정책(https://operations.osmfoundation.org/policies/tiles/)상
-   대규모 트래픽에는 맞지 않습니다. 방문자가 많아지면 아래 TILE 만 다른
-   제공자로 바꾸세요. 지도 코드는 손댈 필요가 없습니다.
+   OSM 공식 타일과 CARTO 무료 타일 모두 사용 정책이 있습니다
+   (https://operations.osmfoundation.org/policies/tiles/ ,
+    https://carto.com/attributions ).
+   방문자가 크게 늘면 MapTiler 같은 유료 제공자로 url 을 바꾸세요.
    ──────────────────────────────────────────────────────── */
-JB.TILE = {
-  url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자',
-  maxZoom: 19
+var OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자';
+var CARTO_ATTR = OSM_ATTR + ' &copy; <a href="https://carto.com/attributions">CARTO</a>';
+
+JB.TILE_PRESETS = {
+  plain: {
+    label: '단순 (밝은 회색)',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution: CARTO_ATTR, subdomains: 'abcd', maxZoom: 20, gray: false
+  },
+  nolabel: {
+    label: '아주 단순 (지명 없음)',
+    url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+    attribution: CARTO_ATTR, subdomains: 'abcd', maxZoom: 20, gray: false
+  },
+  osm: {
+    label: '기본 OSM (지명 많음)',
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: OSM_ATTR, maxZoom: 19, gray: true
+  },
+  dark: {
+    label: '어두운 배경',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: CARTO_ATTR, subdomains: 'abcd', maxZoom: 20, gray: false
+  },
+  none: {
+    label: '배경 없음',
+    url: null, attribution: '', maxZoom: 20, gray: false
+  }
 };
 
-/* 배경을 흑백으로 깔아 학교 마커가 도드라지게 한다 (false 면 원래 색) */
-JB.TILE_GRAYSCALE = true;
+JB.TILE_DEFAULT = 'plain';
+JB.TILE_STORE = 'jb.tile';
+
+JB.tileKey = function () {
+  var k;
+  try { k = localStorage.getItem(JB.TILE_STORE); } catch (e) { /* 사생활 보호 모드 */ }
+  return JB.TILE_PRESETS[k] ? k : JB.TILE_DEFAULT;
+};
+JB.setTileKey = function (k) {
+  try { localStorage.setItem(JB.TILE_STORE, k); } catch (e) { /* 무시 */ }
+};
 
 /* 학교급 정의 */
 JB.TYPES = {

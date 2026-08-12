@@ -46,7 +46,7 @@
 - 목록에서 학교를 고르면 시트가 접히면서 지도가 크게 열립니다. 손잡이를 올리면
   보던 자리 그대로 목록으로 돌아옵니다.
 - 시군을 고르거나 학교를 고를 때, 시트가 가리는 높이를 뺀 영역에 맞춰 지도가 움직입니다.
-- 마커·라벨과 카드가 좁은 화면용 크기로 줄어듭니다.
+- 마커·라벨과 카드가 좁은 화면용 크기로 줄어들고, 헤더는 한 줄로 접힙니다.
 
 ## 데이터
 
@@ -112,23 +112,36 @@
 
 원본 순창 지도의 `ox/oy` 25건과 남원 지도의 8방향 배치 39건은 그대로 계승했습니다.
 
-## 배경지도 바꾸기
+## 배경지도
 
-`assets/js/config.js` 의 `JB.TILE` 한 곳만 고치면 됩니다. 지도 코드는 손댈 필요가 없습니다.
+화면 오른쪽 위 **배경** 선택창에서 바로 바꿔 볼 수 있고, 고른 값은 그 브라우저에 저장됩니다.
+전부 API 키가 필요 없습니다.
+
+| 값 | 배경 | 비고 |
+|---|---|---|
+| `plain` | 단순 (밝은 회색) — **기본** | CARTO Positron. 지명은 있고 색이 절제돼 마커가 잘 보입니다 |
+| `nolabel` | 아주 단순 (지명 없음) | 도형과 도로만. 학교 라벨만 남기고 싶을 때 |
+| `osm` | 기본 OSM (지명 많음) | 정보량이 많아 흑백 필터를 걸어 둡니다 |
+| `dark` | 어두운 배경 | 발표 화면용 |
+| `none` | 배경 없음 | 흰 바탕에 경계와 마커만. 인쇄·문서 삽입용 |
+
+모두에게 적용할 기본값은 `assets/js/config.js` 의 `JB.TILE_DEFAULT` 를 고칩니다.
+타일 제공자를 새로 넣으려면 같은 파일의 `JB.TILE_PRESETS` 에 항목을 추가하세요.
 
 ```js
-JB.TILE = {
-  url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자',
-  maxZoom: 19
+JB.TILE_PRESETS.mine = {
+  label: '내 타일',
+  url: 'https://.../{z}/{x}/{y}.png',
+  attribution: '&copy; 제공자',
+  maxZoom: 19,
+  gray: false        // true 면 흑백 필터
 };
-JB.TILE_GRAYSCALE = true;   // 배경을 흑백으로 눌러 마커를 도드라지게
+JB.TILE_DEFAULT = 'mine';
 ```
 
-> OSM 공식 타일은 [사용 정책](https://operations.osmfoundation.org/policies/tiles/)상
-> 트래픽이 큰 서비스에는 맞지 않습니다. 방문자가 많아지면 CARTO·Stadia·MapTiler 같은
-> 제공자로 `url` 을 바꾸세요(대개 무료 구간이 있고 키가 필요합니다).
-> 국내 지명이 촘촘한 배경이 필요하면 VWorld 타일도 같은 방식으로 붙일 수 있습니다.
+> OSM 공식 타일과 CARTO 무료 타일 모두 [사용](https://operations.osmfoundation.org/policies/tiles/)
+> [정책](https://carto.com/attributions)이 있습니다. 트래픽이 크게 늘면 MapTiler 같은 유료
+> 제공자로 옮기세요. 국내 지명이 촘촘한 배경이 필요하면 VWorld 도 같은 방식으로 붙습니다.
 
 ## 배포
 

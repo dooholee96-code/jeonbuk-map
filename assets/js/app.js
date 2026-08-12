@@ -25,11 +25,8 @@
       zoomControl: true, attributionControl: true,
       worldCopyJump: false
     });
-    L.tileLayer(JB.TILE.url, {
-      attribution: JB.TILE.attribution,
-      maxZoom: JB.TILE.maxZoom,
-      className: JB.TILE_GRAYSCALE ? 'jb-tiles-gray' : ''
-    }).addTo(map);
+    buildTileSelect();
+    applyTile(JB.tileKey());
 
     // 라벨은 마커 위, 지시선은 마커 아래로 그리기 위한 전용 레이어
     map.createPane('jbLines').style.zIndex = 610;
@@ -48,6 +45,37 @@
 
     var fromHash = (location.hash || '').replace('#', '');
     selectRegion(fromHash && JB.regionByKey(fromHash) ? fromHash : null);
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     배경지도 — 키 없는 타일 몇 가지 중에서 고른다
+     ══════════════════════════════════════════════════════════ */
+  var tileLayer = null;
+
+  function applyTile(key) {
+    var t = JB.TILE_PRESETS[key] || JB.TILE_PRESETS[JB.TILE_DEFAULT];
+    if (tileLayer) { map.removeLayer(tileLayer); tileLayer = null; }
+    if (t.url) {
+      tileLayer = L.tileLayer(t.url, {
+        attribution: t.attribution,
+        subdomains: t.subdomains || 'abc',
+        maxZoom: t.maxZoom || 19,
+        detectRetina: true,
+        className: t.gray ? 'jb-tiles-gray' : ''
+      }).addTo(map);
+    }
+    map.setMaxZoom(t.maxZoom || 19);
+    JB.setTileKey(key);
+    if ($('#tileSel').value !== key) $('#tileSel').value = key;
+  }
+
+  function buildTileSelect() {
+    var sel = $('#tileSel');
+    sel.innerHTML = Object.keys(JB.TILE_PRESETS).map(function (k) {
+      return '<option value="' + k + '">' + JB.TILE_PRESETS[k].label + '</option>';
+    }).join('');
+    sel.value = JB.tileKey();
+    sel.onchange = function () { applyTile(sel.value); };
   }
 
   /* 헤더는 화면 폭에 따라 줄바꿈되므로 실제 높이를 CSS 변수로 되먹인다 */
