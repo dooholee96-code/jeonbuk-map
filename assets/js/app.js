@@ -63,9 +63,14 @@
      ══════════════════════════════════════════════════════════ */
   var tileLayer = null;
 
+  var tileWatch = null;
+
   function applyTile(key) {
     var t = JB.TILE_PRESETS[key] || JB.TILE_PRESETS[JB.TILE_DEFAULT];
     if (tileLayer) { map.removeLayer(tileLayer); tileLayer = null; }
+    clearTimeout(tileWatch);
+    hideTileWarn();
+
     if (t.url) {
       tileLayer = L.tileLayer(t.url, {
         attribution: t.attribution,
@@ -73,11 +78,45 @@
         maxZoom: t.maxZoom || 19,
         detectRetina: true,
         className: t.gray ? 'jb-tiles-gray' : ''
-      }).addTo(map);
+      });
+
+      /* 타일 제공자가 막히거나 조건이 바뀌면(키 요구 등) 조용히 회색 화면이 된다.
+         한 장도 못 받고 실패만 쌓이면 알려 주고, 키가 필요 없는 OSM 으로 넘긴다. */
+      var ok = 0, fail = 0;
+      tileLayer.on('tileload', function () { ok++; });
+      tileLayer.on('tileerror', function () { fail++; });
+      tileWatch = setTimeout(function () {
+        if (ok > 0 || fail < 3) return;
+        if (key !== 'osm') {
+          applyTile('osm');          // 먼저 바꾸고 나서 알린다 (applyTile 이 알림을 지운다)
+          showTileWarn(t.label + ' 배경을 불러오지 못했습니다. 제공자 쪽 문제로 보여 ' +
+            '「기본 OSM」으로 바꿨습니다.', true);
+        } else {
+          showTileWarn('배경지도를 불러오지 못했습니다. 인터넷 연결을 확인하거나, ' +
+            '[배경]에서 「배경 없음」을 고르면 경계와 마커만으로 볼 수 있습니다.', false);
+        }
+      }, 6000);
+
+      tileLayer.addTo(map);
     }
     map.setMaxZoom(t.maxZoom || 19);
     JB.setTileKey(key);
     if ($('#tileSel').value !== key) $('#tileSel').value = key;
+  }
+
+  var warnTimer = null;
+  function showTileWarn(msg, auto) {
+    var el = $('#tileWarn');
+    clearTimeout(warnTimer);          // 앞선 알림의 자동닫기가 이 알림을 끄지 않도록
+    el.innerHTML = '<span>' + esc(msg) + '</span><button aria-label="닫기">×</button>';
+    el.hidden = false;
+    el.querySelector('button').onclick = hideTileWarn;
+    if (auto) warnTimer = setTimeout(hideTileWarn, 9000);
+  }
+  function hideTileWarn() {
+    clearTimeout(warnTimer);
+    var el = $('#tileWarn');
+    if (el) { el.hidden = true; el.innerHTML = ''; }
   }
 
   function buildTileSelect() {
