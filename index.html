@@ -31,6 +31,15 @@
       <button class="btn" id="btnFit">지역 맞춤</button>
     </div>
   </div>
+  <div id="editBar" hidden>
+    <span class="eb-tag">편집 중</span>
+    <span id="editCount">변경 없음</span>
+    <span class="eb-spacer"></span>
+    <button class="btn small" data-act="add">+ 학교 추가</button>
+    <button class="btn small primary" data-act="export">내보내기</button>
+    <button class="btn small" data-act="discard">되돌리기</button>
+    <button class="btn small" data-act="off">편집 끝</button>
+  </div>
 </header>
 
 <div id="shell">
@@ -84,6 +93,8 @@
   </div>
 </div>
 
+<div id="modal" hidden></div>
+
 <!-- 지도 라이브러리 (저장소에 동봉 — CDN·API 키 불필요) -->
 <script src="assets/vendor/leaflet/leaflet.js"></script>
 
@@ -108,6 +119,7 @@
 <script src="data/regions/gunsan.js"></script>
 
 <script src="assets/js/labels.js"></script>
+<script src="assets/js/edit.js"></script>
 <script src="assets/js/app.js"></script>
 </body>
 </html>

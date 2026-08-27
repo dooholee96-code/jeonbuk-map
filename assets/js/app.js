@@ -43,8 +43,19 @@
     map.on('moveend zoomend resize', scheduleRelayout);
     window.addEventListener('resize', scheduleRelayout);
 
+    var stale = JB.applyEdits();
+    if (JB.editMode) document.body.classList.add('edit-mode');
+    buildEditBar();
+
     var fromHash = (location.hash || '').replace('#', '');
     selectRegion(fromHash && JB.regionByKey(fromHash) ? fromHash : null);
+
+    if (stale.length) {
+      alert('데이터 파일이 갱신되어, 이 브라우저에 저장돼 있던 ' +
+        stale.map(function (k) { return JB.regionByKey(k).name; }).join('·') +
+        ' 편집분은 적용하지 않았습니다.\n' +
+        '필요하면 [편집] 막대의 [되돌리기]로 정리하세요.');
+    }
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -602,12 +613,165 @@
       (s.tags && s.tags.length ? '<div class="d-tags">' + s.tags.map(function (t) { return '<span>#' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
       (s.desc ? '<p class="d-desc">' + esc(s.desc) + '</p>' : '') +
       '<p class="d-coord">' + s.lat.toFixed(6) + ', ' + s.lng.toFixed(6) +
-        (s.approx ? ' <em class="warn-inline">좌표 미확정</em>' : '') + '</p>';
+        (s.approx ? ' <em class="warn-inline">좌표 미확정</em>' : '') + '</p>' +
+      (JB.editMode
+        ? '<div class="d-edit">' +
+            '<div class="d-edit-label">농촌유학</div>' +
+            '<div class="seg">' +
+              seg('', '미지정', !s.rural) + seg('희망', '희망', s.rural === '희망') +
+              seg('운영', '운영', s.rural === '운영') +
+            '</div>' +
+            '<button class="btn small" id="btnEditSchool">정보 수정</button>' +
+          '</div>'
+        : '');
+
+    if (JB.editMode) {
+      panel.querySelectorAll('.seg button').forEach(function (b) {
+        b.onclick = function () { setRural(s, b.dataset.v); };
+      });
+      panel.querySelector('#btnEditSchool').onclick = function () { openForm(s); };
+    }
 
     panel.querySelector('.close').onclick = function () {
       panel.classList.remove('open'); state.selected = null; highlight(null); scheduleRelayout();
     };
     scheduleRelayout();
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     편집 모드 — 브라우저에 쌓고 파일로 내보낸다
+     ══════════════════════════════════════════════════════════ */
+  function buildEditBar() {
+    if (!JB.editMode) return;
+    var bar = $('#editBar');
+    bar.hidden = false;
+    bar.onclick = function (e) {
+      var act = (e.target.dataset || {}).act;
+      if (act === 'add') addSchool();
+      else if (act === 'export') exportDirty();
+      else if (act === 'discard') discardAll();
+      else if (act === 'off') {
+        if (JB.dirtyRegions().length &&
+            !confirm('내보내지 않은 변경사항이 있습니다. 그래도 편집 모드를 끌까요?\n(변경사항은 지워지지 않습니다)')) return;
+        location.search = '?edit=0';
+      }
+    };
+    refreshEditBar();
+  }
+
+  function refreshEditBar() {
+    if (!JB.editMode) return;
+    var dirty = JB.dirtyRegions();
+    $('#editCount').textContent = dirty.length
+      ? dirty.map(function (k) { return JB.regionByKey(k).name; }).join(', ') + ' 변경됨'
+      : '변경 없음';
+    $('#editBar').classList.toggle('has-changes', dirty.length > 0);
+  }
+
+  function commitRegion(key) {
+    JB.saveRegion(key);
+    refreshEditBar();
+    render();
+  }
+
+  function exportDirty() {
+    var dirty = JB.dirtyRegions();
+    if (!dirty.length) return alert('내보낼 변경사항이 없습니다.');
+    dirty.forEach(function (k, i) {
+      setTimeout(function () { JB.download(k + '.js', JB.exportRegion(k)); }, i * 350);
+    });
+    alert(dirty.length + '개 파일을 내려받습니다.\n\n' +
+      dirty.map(function (k) { return '  ' + JB.regionByKey(k).name + ' → data/regions/' + k + '.js'; }).join('\n') +
+      '\n\n저장소의 같은 경로에 덮어쓰면 모두에게 반영됩니다.');
+  }
+
+  function discardAll() {
+    if (!confirm('이 브라우저에 저장된 편집사항을 모두 지울까요?\n저장소 파일은 그대로입니다.')) return;
+    JB.discardEdits();
+    location.reload();
+  }
+
+  /* 폼 열기 — school 이 없으면 새 학교 */
+  var pickHandler = null;
+  function openForm(school, key) {
+    var isNew = !school;
+    var regionKey = key || (school && school._region) || state.region;
+    if (!regionKey) return alert('먼저 시·군을 고르세요. 어느 지역에 넣을지 정해야 합니다.');
+    var region = JB.regionByKey(regionKey);
+    var draft = school || { t: 'elem', lat: '', lng: '', ph: '' };
+
+    var box = $('#modal');
+    box.innerHTML = JB.editFormHtml(draft, region.name, isNew);
+    box.hidden = false;
+    document.body.classList.add('modal-open');
+    var form = box.querySelector('.edit-form');
+
+    function close() {
+      stopPick();
+      box.hidden = true; box.innerHTML = '';
+      document.body.classList.remove('modal-open');
+      document.removeEventListener('keydown', onKey);
+    }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey);
+
+    form.onclick = function (e) {
+      var act = (e.target.dataset || {}).act;
+      if (!act) return;
+      if (act === 'cancel') return close();
+      if (act === 'pick') return startPick(form, e.target);
+      if (act === 'delete') {
+        if (!confirm('“' + school.n + '” 을(를) 목록에서 지울까요?')) return;
+        var arr = JB.DATA[regionKey].schools;
+        arr.splice(arr.indexOf(school), 1);
+        close(); $('#detail').classList.remove('open'); state.selected = null;
+        commitRegion(regionKey);
+        return;
+      }
+      if (act === 'save') {
+        var res = JB.readEditForm(form, isNew ? {} : school);
+        if (res.error) return alert(res.error);
+        var arr = JB.DATA[regionKey].schools;
+        var dup = arr.filter(function (x) { return x.n === res.school.n && x !== school; })[0];
+        if (dup) return alert('같은 이름의 학교가 이미 있습니다: ' + res.school.n);
+        if (isNew) arr.push(res.school);
+        else { for (var k in school) if (k.charAt(0) !== '_') delete school[k];
+               for (var k2 in res.school) school[k2] = res.school[k2]; }
+        close();
+        commitRegion(regionKey);
+        var saved = isNew ? arr[arr.length - 1] : school;
+        saved._region = regionKey;
+        selectSchool(saved);
+        map.setView([saved.lat, saved.lng], Math.max(map.getZoom(), 12));
+        return;
+      }
+    };
+  }
+
+  function startPick(form, btn) {
+    stopPick();
+    btn.textContent = '지도를 클릭하세요…';
+    document.body.classList.add('picking');
+    pickHandler = function (e) {
+      form.querySelector('[name="lat"]').value = e.latlng.lat.toFixed(7);
+      form.querySelector('[name="lng"]').value = e.latlng.lng.toFixed(7);
+      btn.textContent = '지도에서 위치 찍기';
+      stopPick();
+    };
+    map.on('click', pickHandler);
+  }
+  function stopPick() {
+    if (pickHandler) { map.off('click', pickHandler); pickHandler = null; }
+    document.body.classList.remove('picking');
+  }
+
+  function addSchool() { openForm(null, state.region); }
+
+  /* 상세카드에서 농촌유학 상태만 빠르게 바꾼다 */
+  function setRural(s, v) {
+    if (v) s.rural = v; else delete s.rural;
+    commitRegion(s._region);
+    selectSchool(s);
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -632,6 +796,10 @@
       highlight(null);
       scheduleRelayout();
     });
+  }
+
+  function seg(v, label, on) {
+    return '<button data-v="' + v + '"' + (on ? ' class="on"' : '') + '>' + label + '</button>';
   }
 
   function esc(s) {
