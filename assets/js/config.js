@@ -2,42 +2,37 @@
 window.JB = window.JB || {};
 
 /* ── 배경지도 타일 ────────────────────────────────────────
-   전부 API 키 없이 쓰는 타일입니다. 화면 오른쪽 위 [배경] 선택창에서
-   바꿔 볼 수 있고, 고른 값은 그 브라우저에 저장됩니다.
-   기본값을 바꾸려면 아래 JB.TILE_DEFAULT 를 고치세요.
+   키가 필요 없는 tile.openstreetmap.org 하나만 씁니다.
+   "단순" 배경은 별도 제공자가 아니라, 같은 타일에 CSS 필터를 걸어
+   회색으로 눌러 놓은 것입니다. 그래서 제공자 정책이 바뀌어도 안 깨집니다.
 
-   OSM 공식 타일과 CARTO 무료 타일 모두 사용 정책이 있습니다
-   (https://operations.osmfoundation.org/policies/tiles/ ,
-    https://carto.com/attributions ).
-   방문자가 크게 늘면 MapTiler 같은 유료 제공자로 url 을 바꾸세요.
+   CARTO(basemaps.cartocdn.com)는 2026년부터 키를 요구합니다.
+   키 없이 부르면 오류가 아니라 "API KEY REQUIRED" 워터마크가 박힌
+   정상 이미지를 돌려주기 때문에 자동 감지가 되지 않습니다. 그래서 뺐습니다.
+
+   키를 발급받아 다른 제공자를 쓰려면 아래 형식으로 항목을 더하세요.
+     mine: { label: '내 타일', url: 'https://.../{z}/{x}/{y}.png?key=발급키',
+             attribution: '&copy; 제공자', maxZoom: 20, cls: '' }
    ──────────────────────────────────────────────────────── */
+var OSM_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 var OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자';
-var CARTO_ATTR = OSM_ATTR + ' &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
 JB.TILE_PRESETS = {
   plain: {
-    label: '단순 (밝은 회색)',
-    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    attribution: CARTO_ATTR, subdomains: 'abcd', maxZoom: 20, gray: false
+    label: '단순 (연회색)',
+    url: OSM_URL, attribution: OSM_ATTR, maxZoom: 19, cls: 'jb-tiles-plain'
   },
-  nolabel: {
-    label: '아주 단순 (지명 없음)',
-    url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-    attribution: CARTO_ATTR, subdomains: 'abcd', maxZoom: 20, gray: false
+  soft: {
+    label: '아주 연하게',
+    url: OSM_URL, attribution: OSM_ATTR, maxZoom: 19, cls: 'jb-tiles-soft'
   },
   osm: {
-    label: '기본 OSM (지명 많음)',
-    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: OSM_ATTR, maxZoom: 19, gray: true
-  },
-  dark: {
-    label: '어두운 배경',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: CARTO_ATTR, subdomains: 'abcd', maxZoom: 20, gray: false
+    label: '원색 (지명 잘 보임)',
+    url: OSM_URL, attribution: OSM_ATTR, maxZoom: 19, cls: ''
   },
   none: {
     label: '배경 없음',
-    url: null, attribution: '', maxZoom: 20, gray: false
+    url: null, attribution: '', maxZoom: 19, cls: ''
   }
 };
 
@@ -47,7 +42,7 @@ JB.TILE_STORE = 'jb.tile';
 JB.tileKey = function () {
   var k;
   try { k = localStorage.getItem(JB.TILE_STORE); } catch (e) { /* 사생활 보호 모드 */ }
-  return JB.TILE_PRESETS[k] ? k : JB.TILE_DEFAULT;
+  return JB.TILE_PRESETS[k] ? k : JB.TILE_DEFAULT;   // 없어진 배경(carto 등)은 기본값으로
 };
 JB.setTileKey = function (k) {
   try { localStorage.setItem(JB.TILE_STORE, k); } catch (e) { /* 무시 */ }

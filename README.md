@@ -142,46 +142,44 @@ GitHub 웹에서 해당 파일을 열고 연필 아이콘 → 전체 선택 후 
 
 ## 배경지도
 
-화면 오른쪽 위 **배경** 선택창에서 바로 바꿔 볼 수 있고, 고른 값은 그 브라우저에 저장됩니다.
+화면 오른쪽 위 **배경** 선택창에서 바꿉니다. 고른 값은 그 브라우저에 저장됩니다.
 
-| 값 | 배경 | 비고 |
-|---|---|---|
-| `plain` | 단순 (밝은 회색) — **기본** | CARTO Positron. 지명은 있고 색이 절제돼 마커가 잘 보입니다 |
-| `nolabel` | 아주 단순 (지명 없음) | 도형과 도로만. 학교 라벨만 남기고 싶을 때 |
-| `osm` | 기본 OSM (지명 많음) | 정보량이 많아 흑백 필터를 걸어 둡니다 |
-| `dark` | 어두운 배경 | 발표 화면용 |
-| `none` | 배경 없음 | 흰 바탕에 경계와 마커만. 인쇄·문서 삽입용 |
+| 값 | 배경 |
+|---|---|
+| `plain` | 단순 (연회색) — **기본** |
+| `soft` | 아주 연하게 |
+| `osm` | 원색 (지명 잘 보임) |
+| `none` | 배경 없음 — 흰 바탕에 경계와 마커만 |
 
-모두에게 적용할 기본값은 `assets/js/config.js` 의 `JB.TILE_DEFAULT` 를 고칩니다.
-타일 제공자를 새로 넣으려면 같은 파일의 `JB.TILE_PRESETS` 에 항목을 추가하세요.
+**타일 제공자는 `tile.openstreetmap.org` 하나뿐이고 키가 필요 없습니다.**
+"단순"과 "아주 연하게"는 다른 제공자가 아니라, 같은 타일에 CSS 필터를 걸어
+회색으로 눌러 놓은 것입니다(`assets/css/app.css` 의 `.jb-tiles-plain` / `.jb-tiles-soft`).
+그래서 제공자 정책이 바뀌어도 배경이 깨지지 않습니다. 톤이 마음에 안 들면
+`grayscale` `contrast` `brightness` `opacity` 값만 만지면 됩니다.
 
-```js
-JB.TILE_PRESETS.mine = {
-  label: '내 타일',
-  url: 'https://.../{z}/{x}/{y}.png',
-  attribution: '&copy; 제공자',
-  maxZoom: 19,
-  gray: false        // true 면 흑백 필터
-};
-JB.TILE_DEFAULT = 'mine';
-```
+> **CARTO 를 쓰지 않는 이유** — 예전에는 CARTO Positron 을 기본으로 썼는데,
+> CARTO 가 키를 요구하도록 바뀌면서 타일에 `API KEY REQUIRED` 워터마크가 찍혀
+> 나옵니다. 오류가 아니라 **정상 응답(200)** 으로 워터마크 이미지를 주기 때문에
+> 앱이 자동으로 알아챌 수 없습니다. 그래서 아예 뺐습니다.
+>
+> OSM 공식 타일도 [사용 정책](https://operations.osmfoundation.org/policies/tiles/)상
+> 트래픽이 큰 서비스에는 맞지 않습니다. 방문자가 크게 늘면 MapTiler·Stadia 처럼
+> 키를 발급받는 제공자로 옮기세요. `config.js` 의 `JB.TILE_PRESETS` 에 항목을
+> 하나 더하면 됩니다.
+>
+> ```js
+> JB.TILE_PRESETS.mine = {
+>   label: '내 타일',
+>   url: 'https://.../{z}/{x}/{y}.png?key=발급키',
+>   attribution: '&copy; 제공자', maxZoom: 20, cls: ''
+> };
+> JB.TILE_DEFAULT = 'mine';
+> ```
+>
+> 국내 지명이 촘촘한 배경이 필요하면 VWorld 도 같은 방식으로 붙습니다.
 
-### 타일 제공자에 대해
-
-**`osm` 만 확실하게 키가 필요 없습니다.** `tile.openstreetmap.org` 는 누구나 키 없이 쓸 수 있지만
-[사용 정책](https://operations.osmfoundation.org/policies/tiles/)상 트래픽이 큰 서비스에는 맞지 않습니다.
-
-`plain` `nolabel` `dark` 는 **CARTO** 타일입니다. 지금은 키 없이 열리지만
-[CARTO 의 이용 조건](https://carto.com/attributions)은 바뀔 수 있고, 실제로 무료 사용 범위를
-좁혀 온 이력이 있습니다.
-
-그래서 배경이 안 뜨면 앱이 알아서 처리합니다.
-
-- 타일을 한 장도 못 받고 실패만 쌓이면 → **`osm` 으로 자동 전환**하고 이유를 알려 줍니다
-- `osm` 마저 실패하면 → 연결 확인 안내와 함께 `배경 없음` 을 권합니다
-
-트래픽이 커지거나 특정 배경을 고정해야 하면 MapTiler 같은 유료 제공자로 `url` 을 바꾸세요.
-국내 지명이 촘촘한 배경이 필요하면 VWorld 도 같은 방식으로 붙습니다.
+타일을 아예 못 받으면(제공자 장애·연결 끊김) 앱이 알림을 띄우고 `osm` 으로 넘깁니다.
+다만 위 CARTO 사례처럼 **정상 응답에 워터마크만 찍혀 오는 경우는 감지하지 못합니다.**
 
 ## 배포
 

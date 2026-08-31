@@ -77,7 +77,7 @@
         subdomains: t.subdomains || 'abc',
         maxZoom: t.maxZoom || 19,
         detectRetina: true,
-        className: t.gray ? 'jb-tiles-gray' : ''
+        className: t.cls || ''
       });
 
       /* 타일 제공자가 막히거나 조건이 바뀌면(키 요구 등) 조용히 회색 화면이 된다.

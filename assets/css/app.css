@@ -228,8 +228,10 @@ body.panel-collapsed #panel { margin-left: calc(-1 * var(--panel-w)); }
 .ov-line { pointer-events: none !important; }
 .ov-line svg { position: absolute; top: 0; left: 0; overflow: visible; }
 
-/* 배경지도를 흑백으로 눌러 마커를 도드라지게 */
-.jb-tiles-gray { filter: grayscale(0.85) brightness(1.06) contrast(0.94); }
+/* 배경지도 톤 — 같은 OSM 타일에 필터만 달리 걸어 단순하게 만든다.
+   제공자를 바꾸지 않으므로 정책 변경에 영향받지 않는다. */
+.jb-tiles-plain { filter: grayscale(1) contrast(.78) brightness(1.14) opacity(.9); }
+.jb-tiles-soft  { filter: grayscale(1) contrast(.6)  brightness(1.26) opacity(.72); }
 
 .marker-dot {
   width: 15px; height: 15px; border-radius: 50%;
