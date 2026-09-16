@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>무주 유·초·중·고 취합 체크리스트</title>
+<meta name="description" content="무주군 유치원·초·중·고를 대상으로 공문·자료 취합 상황을 한 화면에서 체크합니다. 외부 요청 없이 파일 하나로 동작합니다.">
+<style>
+/* 파일 하나로 끝나도록 CSS·JS·데이터를 모두 안에 넣었습니다. 외부 요청 없음. */
+:root{
+  --bg:#f1f5f9; --panel:#fff; --line:#e2e8f0; --ink:#0f172a; --muted:#64748b;
+  --accent:#15803d; --accent-soft:#dcfce7; --todo:#b91c1c; --todo-soft:#fee2e2;
+  --shadow:0 2px 10px rgba(15,23,42,.08);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}   /* display:flex 가 hidden 속성을 덮지 않도록 */
+html,body{margin:0;padding:0;height:100%}
+body{
+  font-family:'Pretendard','Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif;
+  color:var(--ink); background:var(--bg); font-size:14px;
+  -webkit-text-size-adjust:100%;
+  display:flex; flex-direction:column;
+}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+
+/* ── 머리말 ─────────────────────────────────────────── */
+header{
+  position:sticky; top:0; z-index:30;
+  background:var(--panel); border-bottom:1px solid var(--line); box-shadow:var(--shadow);
+  padding:8px 10px;
+}
+.hd{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+h1{font-size:15px; margin:0; letter-spacing:-.3px; white-space:nowrap}
+h1 small{font-weight:500; color:var(--muted); font-size:12px; margin-left:4px; white-space:normal}
+.sp{flex:1 1 auto}
+.btn{
+  border:1px solid var(--line); background:#fff; border-radius:7px;
+  padding:4px 9px; font-size:12px; color:#334155; white-space:nowrap;
+}
+.btn:hover{background:#f8fafc}
+.btn.on{background:var(--accent-soft); border-color:#86efac; color:#14532d}
+.btn.danger{color:#b91c1c}
+#q{
+  border:1px solid var(--line); border-radius:7px; padding:4px 8px;
+  width:150px; font-size:12px; background:#fff;
+}
+.ck{display:inline-flex; align-items:center; gap:4px; font-size:12px; color:#334155; white-space:nowrap}
+.ck input{margin:0}
+
+/* 학교급 필터 */
+.tfil{display:inline-flex; gap:4px}
+.tfil button{
+  border:1px solid var(--line); background:#fff; border-radius:999px;
+  width:26px; height:24px; font-size:12px; font-weight:700; color:#94a3b8; padding:0;
+}
+.tfil button.on{color:#fff}
+
+/* 알림줄 */
+.note{
+  margin-top:6px; font-size:11.5px; color:#92400e; background:#fffbeb;
+  border:1px solid #fde68a; border-radius:7px; padding:5px 8px;
+  display:flex; gap:6px; align-items:flex-start; line-height:1.45;
+}
+.note button{border:0;background:none;color:#92400e;font-size:13px;line-height:1;padding:0 2px}
+
+/* 백업 서랍 */
+#tools{
+  margin-top:6px; border:1px solid var(--line); border-radius:7px; background:#f8fafc;
+  padding:7px 8px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-size:12px;
+}
+#tools .hint{color:var(--muted)}
+
+/* ── 표 ─────────────────────────────────────────────── */
+main{flex:1 1 auto; overflow:auto; padding:0 10px 40px}
+table{border-collapse:separate; border-spacing:0; width:100%; background:var(--panel)}
+th,td{border-bottom:1px solid var(--line); text-align:left}
+thead th{
+  position:sticky; top:0; z-index:20; background:var(--panel);
+  border-bottom:2px solid var(--line); vertical-align:top; padding:7px 8px;
+}
+th.sch,td.sch{
+  position:sticky; left:0; z-index:10; background:var(--panel);
+  min-width:190px; max-width:260px;
+}
+thead th.sch{z-index:25}
+td.sch{padding:5px 8px}
+th.add{width:44px; text-align:center}
+
+/* 건 머리 */
+.cs{min-width:112px}
+.cs-top{display:flex; align-items:center; gap:4px}
+.cs-name{
+  border:1px solid transparent; background:transparent; border-radius:5px;
+  font-size:12.5px; font-weight:700; padding:2px 4px; width:100%; min-width:0;
+}
+.cs-name:hover,.cs-name:focus{border-color:var(--line); background:#fff; outline:none}
+.cs-gear{border:0;background:none;color:#94a3b8;font-size:12px;padding:0 2px}
+.cs-gear:hover{color:#334155}
+.bar{height:4px; border-radius:99px; background:#e2e8f0; overflow:hidden; margin:5px 0 3px}
+.bar i{display:block; height:100%; background:var(--accent); border-radius:99px}
+.cs-stat{font-size:11px; color:var(--muted); white-space:nowrap}
+.cs-stat b{color:var(--accent)}
+.cs-stat em{font-style:normal; color:var(--todo)}
+.cs-panel{margin-top:6px; padding-top:6px; border-top:1px dashed var(--line); display:grid; gap:5px}
+.cs-panel .row{display:flex; gap:4px; align-items:center; flex-wrap:wrap}
+.cs-panel label{font-size:11px; color:var(--muted)}
+.cs-panel input[type=date]{border:1px solid var(--line); border-radius:6px; padding:2px 4px; font-size:11px}
+.cs-due{font-size:11px; color:var(--muted)}
+.cs-due.soon{color:#b45309; font-weight:700}
+.cs-due.over{color:var(--todo); font-weight:700}
+
+/* 학교 줄 */
+tbody tr:hover td{background:#f8fafc}
+tbody tr:hover td.sch{background:#f8fafc}
+.grp td{
+  background:#f1f5f9; font-size:11.5px; font-weight:700; color:#475569;
+  padding:4px 8px; position:sticky; left:0;
+}
+.nm{font-weight:600}
+.badge{
+  display:inline-block; width:17px; height:17px; line-height:17px; text-align:center;
+  border-radius:5px; color:#fff; font-size:11px; font-weight:700; margin-right:6px;
+}
+.ph{color:var(--muted); font-size:11px; margin-left:6px}
+.warn{color:#b45309; font-size:11px; margin-left:4px; cursor:help}
+
+/* 체크 칸 */
+td.mk{text-align:center; padding:0}
+td.mk button{
+  width:100%; height:100%; min-height:30px; border:0; background:none;
+  font-size:15px; line-height:1; color:#cbd5e1;
+}
+td.mk button:hover{background:#f1f5f9}
+td.mk.v1{background:var(--accent-soft)}
+td.mk.v1 button{color:var(--accent)}
+td.mk.v0 button{color:#cbd5e1}
+td.mk.v2 button{color:#cbd5e1}
+td.mk.off{background:repeating-linear-gradient(45deg,#f8fafc,#f8fafc 5px,#f1f5f9 5px,#f1f5f9 10px)}
+td.mk.off button{color:#e2e8f0; cursor:default}
+
+.empty{padding:26px 10px; color:var(--muted); text-align:center}
+footer{padding:8px 12px; color:var(--muted); font-size:11px}
+
+/* 작게 보기 — 상시 띄워두는 좁은 창용 */
+body.compact{font-size:13px}
+body.compact h1{font-size:13.5px}
+body.compact td.sch{padding:2px 6px}
+body.compact .badge{width:15px;height:15px;line-height:15px;font-size:10px;margin-right:4px}
+body.compact td.mk button{min-height:24px; font-size:14px}
+body.compact thead th{padding:5px 6px}
+body.compact .ph{display:none}
+body.compact .note{display:none}
+
+@media (max-width:560px){
+  #q{width:110px}
+  th.sch,td.sch{min-width:150px}
+  #hdCount{display:none}
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --line:#334155; --ink:#e2e8f0; --muted:#94a3b8;
+    --accent:#4ade80; --accent-soft:#14532d; --todo:#fca5a5;
+  }
+  .btn{background:#1e293b; color:#cbd5e1}
+  .btn:hover{background:#334155}
+  #q,.cs-panel input[type=date]{background:#0f172a}
+  .grp td{background:#0f172a; color:#cbd5e1}
+  tbody tr:hover td,tbody tr:hover td.sch{background:#263449}
+  td.mk button:hover{background:#334155}
+  td.mk.off{background:repeating-linear-gradient(45deg,#1e293b,#1e293b 5px,#172033 5px,#172033 10px)}
+  .note{background:#422006; border-color:#854d0e; color:#fde68a}
+  .note button{color:#fde68a}
+  #tools{background:#0f172a}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hd">
+    <h1>무주 취합 체크리스트<small id="hdCount"></small></h1>
+    <span class="sp"></span>
+    <input id="q" type="search" placeholder="학교 검색" autocomplete="off">
+    <span class="tfil" id="tfil"></span>
+    <label class="ck"><input type="checkbox" id="onlyTodo"> 미제출만</label>
+    <button class="btn" id="btnCompact">작게</button>
+    <button class="btn" id="btnTools">백업</button>
+  </div>
+
+  <div class="note" id="note" hidden>
+    <span id="noteTxt"></span>
+    <span class="sp"></span>
+    <button id="noteX" title="닫기">✕</button>
+  </div>
+
+  <div id="tools" hidden>
+    <button class="btn" id="btnExport">파일로 내보내기</button>
+    <label class="btn" style="display:inline-block">불러오기<input type="file" id="fileIn" accept="application/json" hidden></label>
+    <button class="btn" id="btnAddSchool">+ 학교 추가</button>
+    <button class="btn danger" id="btnReset">전부 초기화</button>
+    <span class="hint" id="savedAt"></span>
+  </div>
+</header>
+
+<main>
+  <table id="grid"></table>
+  <div class="empty" id="empty" hidden>조건에 맞는 학교가 없습니다.</div>
+</main>
+
+<footer>
+  체크 내용은 이 브라우저에만 저장됩니다(localStorage). 다른 PC로 옮기거나 백업하려면 <b>백업 → 파일로 내보내기</b>를 쓰세요.
+</footer>
+
+<script>
+/* ──────────────────────────────────────────────────────────────
+   무주 유·초·중·고 취합 체크리스트 — 단일 파일, 외부 요청 없음
+
+   초·중·고 18곳: 이 저장소의 data/regions/muju.js 와 같은 값
+     (2026학년도 전북교육청 초·중·고 현황).
+   유치원 6곳: 외부망이 막힌 환경이라 교육청 원문을 받지 못했고,
+     공개 검색으로 확인되는 곳만 넣었습니다. 무주 관내 유치원은
+     단설 1 + 병설 8 = 9곳으로 알려져 있으니, 빠진 곳은
+     [백업 → + 학교 추가] 로 채워 넣으세요.
+   ────────────────────────────────────────────────────────────── */
+
+var SCHOOLS = [
+  /* 유치원 — 확인된 범위(chk:0 은 미확인 표시) */
+  {n:'무주반디유치원',            t:'kinder', ph:'무주읍', chk:1},
+  {n:'설천초등학교병설유치원',    t:'kinder', ph:'설천면', chk:0},
+  {n:'안성초등학교병설유치원',    t:'kinder', ph:'안성면', chk:1},
+  {n:'부남초등학교병설유치원',    t:'kinder', ph:'부남면', chk:1},
+  {n:'적상초등학교병설유치원',    t:'kinder', ph:'적상면', chk:1},
+  {n:'괴목초등학교병설유치원',    t:'kinder', ph:'적상면', chk:1},
+
+  /* 초등학교 9 */
+  {n:'무주중앙초등학교', t:'elem', ph:'무주읍', chk:1},
+  {n:'무주초등학교',     t:'elem', ph:'무주읍', chk:1},
+  {n:'무풍초등학교',     t:'elem', ph:'무풍면', chk:1},
+  {n:'부남초등학교',     t:'elem', ph:'부남면', chk:1},
+  {n:'구천초등학교',     t:'elem', ph:'설천면', chk:1},
+  {n:'설천초등학교',     t:'elem', ph:'설천면', chk:1},
+  {n:'안성초등학교',     t:'elem', ph:'안성면', chk:1},
+  {n:'괴목초등학교',     t:'elem', ph:'적상면', chk:1},
+  {n:'적상초등학교',     t:'elem', ph:'적상면', chk:1},
+
+  /* 중학교 5 */
+  {n:'무주중학교', t:'mid', ph:'무주읍', chk:1},
+  {n:'부남중학교', t:'mid', ph:'부남면', chk:1},
+  {n:'설천중학교', t:'mid', ph:'설천면', chk:1},
+  {n:'안성중학교', t:'mid', ph:'안성면', chk:1},
+  {n:'적상중학교', t:'mid', ph:'적상면', chk:1},
+
+  /* 고등학교 4 */
+  {n:'무주고등학교',   t:'high', ph:'무주읍', chk:1},
+  {n:'설천고등학교',   t:'high', ph:'설천면', chk:1},
+  {n:'안성고등학교',   t:'high', ph:'안성면', chk:1},
+  {n:'푸른꿈고등학교', t:'high', ph:'안성면', chk:1}
+];
+
+var TYPES = {
+  kinder:{label:'유치원',   short:'유', color:'#0d9488', rank:0},
+  elem:  {label:'초등학교', short:'초', color:'#3b82f6', rank:1},
+  mid:   {label:'중학교',   short:'중', color:'#ef4444', rank:2},
+  high:  {label:'고등학교', short:'고', color:'#8b5cf6', rank:3}
+};
+var TORDER = ['kinder','elem','mid','high'];
+
+var MARKS = ['', '✓', '–'];              /* 0 미제출 · 1 제출 · 2 해당없음 */
+var MARK_TITLE = ['미제출 (눌러서 제출 처리)', '제출 완료 (눌러서 해당없음)', '해당없음 (눌러서 미제출)'];
+var MAX_CASES = 6;
+var KEY = 'muju.check.v1';
+
+/* ── 상태 ─────────────────────────────────────────── */
+var S = null;
+
+function newCase(name){
+  return {
+    id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    name: name || '새 취합',
+    due: '',
+    scope: {kinder:true, elem:true, mid:true, high:true},
+    open: false,
+    marks: {}
+  };
+}
+
+function freshState(){
+  return {
+    v: 1,
+    cases: [newCase('취합 1'), newCase('취합 2'), newCase('취합 3')],
+    extra: [],                                  /* 사용자가 더한 학교 */
+    filter: {q:'', types:{kinder:true, elem:true, mid:true, high:true}, onlyTodo:false},
+    compact: false,
+    noteHidden: false,
+    savedAt: ''
+  };
+}
+
+function load(){
+  var raw;
+  try { raw = localStorage.getItem(KEY); } catch(e){ return freshState(); }   /* 사생활 보호 모드 */
+  if (!raw) return freshState();
+  try {
+    var o = JSON.parse(raw);
+    if (!o || !o.cases || !o.cases.length) return freshState();
+    var base = freshState();
+    o.filter = o.filter || base.filter;
+    o.filter.types = o.filter.types || base.filter.types;
+    o.extra = o.extra || [];
+    for (var i=0;i<o.cases.length;i++){
+      var c = o.cases[i];
+      c.marks = c.marks || {};
+      c.scope = c.scope || {kinder:true, elem:true, mid:true, high:true};
+    }
+    return o;
+  } catch(e){ return freshState(); }
+}
+
+function save(){
+  S.savedAt = new Date().toISOString();
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){ /* 용량 초과·차단 시 무시 */ }
+  var at = document.getElementById('savedAt');
+  if (at) at.textContent = '저장됨 ' + fmtTime(new Date());
+}
+
+function fmtTime(d){
+  function p(n){ return (n<10?'0':'') + n; }
+  return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+
+/* ── 목록 ─────────────────────────────────────────── */
+function allSchools(){
+  var list = SCHOOLS.concat(S.extra || []);
+  return list.slice().sort(function(a,b){
+    var ra = TYPES[a.t] ? TYPES[a.t].rank : 9, rb = TYPES[b.t] ? TYPES[b.t].rank : 9;
+    if (ra !== rb) return ra - rb;
+    if (a.ph !== b.ph) return (a.ph||'').localeCompare(b.ph||'', 'ko');
+    return a.n.localeCompare(b.n, 'ko');
+  });
+}
+
+function inScope(c, s){ return !!c.scope[s.t]; }
+function markOf(c, s){ return c.marks[s.n] || 0; }
+
+function caseStat(c, list){
+  var total=0, done=0, skip=0;
+  for (var i=0;i<list.length;i++){
+    var s = list[i];
+    if (!inScope(c, s)) continue;
+    var m = markOf(c, s);
+    if (m === 2){ skip++; continue; }
+    total++;
+    if (m === 1) done++;
+  }
+  return {total:total, done:done, todo:total-done, skip:skip};
+}
+
+function visibleSchools(){
+  var q = (S.filter.q || '').trim().toLowerCase();
+  var out = [];
+  var list = allSchools();
+  for (var i=0;i<list.length;i++){
+    var s = list[i];
+    if (!S.filter.types[s.t]) continue;
+    if (q && (s.n + ' ' + (s.ph||'')).toLowerCase().indexOf(q) < 0) continue;
+    if (S.filter.onlyTodo){
+      var any = false;
+      for (var j=0;j<S.cases.length;j++){
+        var c = S.cases[j];
+        if (inScope(c, s) && markOf(c, s) === 0){ any = true; break; }
+      }
+      if (!any) continue;
+    }
+    out.push(s);
+  }
+  return out;
+}
+
+/* ── 그리기 ───────────────────────────────────────── */
+function el(tag, cls, txt){
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (txt != null) e.textContent = txt;
+  return e;
+}
+
+function render(){
+  document.body.classList.toggle('compact', !!S.compact);
+
+  var all = allSchools();
+  var rows = visibleSchools();
+  var grid = document.getElementById('grid');
+  grid.textContent = '';
+
+  /* 머리 */
+  var thead = el('thead'), htr = el('tr');
+  var thS = el('th', 'sch');
+  thS.appendChild(el('span', null, '학교 ' + rows.length + '곳'));
+  htr.appendChild(thS);
+
+  S.cases.forEach(function(c, idx){ htr.appendChild(caseHead(c, idx, all)); });
+
+  var thAdd = el('th', 'add');
+  if (S.cases.length < MAX_CASES){
+    var bAdd = el('button', 'btn', '+ 건');
+    bAdd.title = '취합 건 추가 (최대 ' + MAX_CASES + '건)';
+    bAdd.onclick = function(){
+      S.cases.push(newCase('취합 ' + (S.cases.length + 1)));
+      save(); render();
+    };
+    thAdd.appendChild(bAdd);
+  }
+  htr.appendChild(thAdd);
+  thead.appendChild(htr);
+  grid.appendChild(thead);
+
+  /* 몸통 */
+  var tbody = el('tbody');
+  var lastType = null;
+  rows.forEach(function(s){
+    if (s.t !== lastType){
+      lastType = s.t;
+      var gtr = el('tr', 'grp'), gtd = el('td');
+      gtd.colSpan = S.cases.length + 2;
+      var meta = TYPES[s.t] || {label:'기타'};
+      var cnt = rows.filter(function(x){ return x.t === s.t; }).length;
+      gtd.textContent = meta.label + ' ' + cnt + '곳';
+      gtr.appendChild(gtd);
+      tbody.appendChild(gtr);
+    }
+    tbody.appendChild(schoolRow(s));
+  });
+  grid.appendChild(tbody);
+
+  document.getElementById('empty').hidden = rows.length > 0;
+
+  /* 머리말 요약 */
+  var sums = S.cases.map(function(c){
+    var st = caseStat(c, all);
+    return c.name + ' ' + st.done + '/' + st.total;
+  });
+  document.getElementById('hdCount').textContent = ' · ' + sums.join(' · ');
+
+  renderTypeFilter();
+}
+
+function caseHead(c, idx, all){
+  var th = el('th', 'cs');
+
+  var top = el('div', 'cs-top');
+  var name = el('input', 'cs-name');
+  name.value = c.name;
+  name.title = '이름을 눌러 고치세요';
+  name.onchange = function(){ c.name = name.value.trim() || '이름 없는 건'; save(); render(); };
+  top.appendChild(name);
+
+  var gear = el('button', 'cs-gear', '⚙');
+  gear.title = '이 건 설정';
+  gear.onclick = function(){ c.open = !c.open; save(); render(); };
+  top.appendChild(gear);
+  th.appendChild(top);
+
+  var st = caseStat(c, all);
+  var bar = el('div', 'bar'), fill = el('i');
+  fill.style.width = (st.total ? Math.round(st.done / st.total * 100) : 0) + '%';
+  bar.appendChild(fill);
+  th.appendChild(bar);
+
+  var stat = el('div', 'cs-stat');
+  var b = el('b', null, String(st.done));
+  stat.appendChild(b);
+  stat.appendChild(document.createTextNode(' / ' + st.total + ' · 미제출 '));
+  stat.appendChild(el('em', null, String(st.todo)));
+  th.appendChild(stat);
+
+  if (c.due){
+    var days = dueDays(c.due);
+    var cls = 'cs-due' + (days < 0 ? ' over' : (days <= 2 ? ' soon' : ''));
+    var txt = '마감 ' + c.due.slice(5).replace('-', '/') +
+      (days < 0 ? ' (' + (-days) + '일 지남)' : (days === 0 ? ' (오늘)' : ' (D-' + days + ')'));
+    th.appendChild(el('div', cls, txt));
+  }
+
+  if (c.open) th.appendChild(casePanel(c, idx));
+  return th;
+}
+
+function dueDays(due){
+  var d = new Date(due + 'T00:00:00');
+  var t = new Date(); t.setHours(0,0,0,0);
+  return Math.round((d - t) / 86400000);
+}
+
+function casePanel(c, idx){
+  var p = el('div', 'cs-panel');
+
+  var r1 = el('div', 'row');
+  r1.appendChild(el('label', null, '대상'));
+  TORDER.forEach(function(t){
+    var b = el('button', 'btn' + (c.scope[t] ? ' on' : ''), TYPES[t].short);
+    b.title = TYPES[t].label + ' 포함/제외';
+    b.onclick = function(){ c.scope[t] = !c.scope[t]; save(); render(); };
+    r1.appendChild(b);
+  });
+  p.appendChild(r1);
+
+  var r2 = el('div', 'row');
+  r2.appendChild(el('label', null, '마감'));
+  var d = el('input'); d.type = 'date'; d.value = c.due || '';
+  d.onchange = function(){ c.due = d.value; save(); render(); };
+  r2.appendChild(d);
+  p.appendChild(r2);
+
+  var r3 = el('div', 'row');
+  var bCopy = el('button', 'btn', '미제출 복사');
+  bCopy.onclick = function(){ copyTodo(c, bCopy); };
+  r3.appendChild(bCopy);
+
+  var bClear = el('button', 'btn', '체크 비우기');
+  bClear.onclick = function(){
+    if (!confirm('"' + c.name + '" 체크를 전부 지울까요?')) return;
+    c.marks = {}; save(); render();
+  };
+  r3.appendChild(bClear);
+
+  if (S.cases.length > 1){
+    var bDel = el('button', 'btn danger', '건 삭제');
+    bDel.onclick = function(){
+      if (!confirm('"' + c.name + '" 을(를) 삭제할까요?')) return;
+      S.cases.splice(idx, 1); save(); render();
+    };
+    r3.appendChild(bDel);
+  }
+  p.appendChild(r3);
+  return p;
+}
+
+function schoolRow(s){
+  var tr = el('tr');
+  var td = el('td', 'sch');
+
+  var meta = TYPES[s.t] || {short:'?', color:'#94a3b8'};
+  var badge = el('span', 'badge', meta.short);
+  badge.style.background = meta.color;
+  td.appendChild(badge);
+  td.appendChild(el('span', 'nm', s.n));
+  if (s.ph) td.appendChild(el('span', 'ph', s.ph));
+  if (s.chk === 0){
+    var w = el('span', 'warn', '⚠');
+    w.title = '공개자료로 끝까지 확인하지 못한 항목입니다. 명단을 확인하고 필요하면 고치세요.';
+    td.appendChild(w);
+  }
+  if (s.user){
+    var x = el('button', 'cs-gear', '✕');
+    x.title = '직접 추가한 학교 — 삭제';
+    x.onclick = function(){
+      if (!confirm(s.n + ' 을(를) 목록에서 지울까요?')) return;
+      S.extra = S.extra.filter(function(e){ return e.n !== s.n; });
+      S.cases.forEach(function(c){ delete c.marks[s.n]; });
+      save(); render();
+    };
+    td.appendChild(x);
+  }
+  tr.appendChild(td);
+
+  S.cases.forEach(function(c){
+    var cell = el('td', 'mk');
+    if (!inScope(c, s)){
+      cell.className = 'mk off';
+      var off = el('button', null, '');
+      off.title = c.name + ' 대상이 아닙니다 (⚙ 에서 대상 학교급을 바꾸세요)';
+      off.onclick = function(){};
+      cell.appendChild(off);
+    } else {
+      var m = markOf(c, s);
+      cell.className = 'mk v' + m;
+      var b = el('button', null, MARKS[m] || '·');
+      b.title = s.n + ' — ' + c.name + ' : ' + MARK_TITLE[m];
+      b.onclick = function(){
+        c.marks[s.n] = (markOf(c, s) + 1) % 3;
+        save(); render();
+      };
+      cell.appendChild(b);
+    }
+    tr.appendChild(cell);
+  });
+
+  tr.appendChild(el('td'));
+  return tr;
+}
+
+function renderTypeFilter(){
+  var wrap = document.getElementById('tfil');
+  wrap.textContent = '';
+  TORDER.forEach(function(t){
+    var on = !!S.filter.types[t];
+    var b = el('button', on ? 'on' : '', TYPES[t].short);
+    b.title = TYPES[t].label + ' 보기/숨기기';
+    if (on){ b.style.background = TYPES[t].color; b.style.borderColor = TYPES[t].color; }
+    b.onclick = function(){ S.filter.types[t] = !on; save(); render(); };
+    wrap.appendChild(b);
+  });
+}
+
+/* ── 미제출 명단 복사 ─────────────────────────────── */
+function copyTodo(c, btn){
+  var all = allSchools();
+  var todo = all.filter(function(s){ return inScope(c, s) && markOf(c, s) === 0; });
+  var st = caseStat(c, all);
+  var text = '[' + c.name + ']' + (c.due ? ' 마감 ' + c.due : '') +
+    ' 미제출 ' + todo.length + '곳 (제출 ' + st.done + '/' + st.total + ')\n' +
+    (todo.length ? todo.map(function(s){ return '· ' + s.n; }).join('\n') : '· 없음 — 전부 제출됐습니다.');
+
+  function done(){
+    var old = btn.textContent;
+    btn.textContent = '복사됨';
+    setTimeout(function(){ btn.textContent = old; }, 1200);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done, function(){ fallback(text, done); });
+  } else {
+    fallback(text, done);
+  }
+}
+
+function fallback(text, done){
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch(e){ prompt('복사해서 쓰세요', text); }
+  document.body.removeChild(ta);
+}
+
+/* ── 백업 ─────────────────────────────────────────── */
+function exportFile(){
+  var blob = new Blob([JSON.stringify(S, null, 2)], {type:'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'muju-check-' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+}
+
+function importFile(file){
+  var r = new FileReader();
+  r.onload = function(){
+    try {
+      var o = JSON.parse(r.result);
+      if (!o || !o.cases || !o.cases.length) throw new Error('형식이 다릅니다');
+      if (!confirm('지금 체크를 덮어씁니다. 계속할까요?')) return;
+      S = o;
+      S.extra = S.extra || [];
+      S.filter = S.filter || freshState().filter;
+      syncControls(); save(); render();
+    } catch(e){ alert('불러오지 못했습니다: ' + e.message); }
+  };
+  r.readAsText(file);
+}
+
+function addSchool(){
+  var n = prompt('추가할 학교(유치원) 이름');
+  if (!n) return;
+  n = n.trim();
+  if (!n) return;
+  if (allSchools().some(function(s){ return s.n === n; })){ alert('이미 목록에 있습니다.'); return; }
+  var t = prompt('학교급 — 유 / 초 / 중 / 고 중 하나', '유');
+  var map = {'유':'kinder','초':'elem','중':'mid','고':'high'};
+  t = map[(t||'').trim()];
+  if (!t){ alert('유·초·중·고 중에서 골라주세요.'); return; }
+  var ph = (prompt('읍·면 (비워도 됩니다)', '무주읍') || '').trim();
+  S.extra.push({n:n, t:t, ph:ph, chk:1, user:true});
+  save(); render();
+}
+
+/* ── 조작부 ───────────────────────────────────────── */
+function syncControls(){
+  document.getElementById('q').value = S.filter.q || '';
+  document.getElementById('onlyTodo').checked = !!S.filter.onlyTodo;
+  document.getElementById('btnCompact').classList.toggle('on', !!S.compact);
+  var note = document.getElementById('note');
+  note.hidden = !!S.noteHidden;
+  document.getElementById('noteTxt').textContent =
+    '유치원 6곳은 공개자료로 확인된 범위입니다(관내 단설 1 + 병설 8 = 9곳으로 알려짐). ' +
+    '⚠ 표시는 확인이 덜 된 곳이고, 빠진 곳은 [백업 → + 학교 추가] 로 채우면 됩니다. 초·중·고 18곳은 2026학년도 전북교육청 현황과 같습니다.';
+}
+
+function bind(){
+  document.getElementById('q').oninput = function(){ S.filter.q = this.value; save(); render(); };
+  document.getElementById('onlyTodo').onchange = function(){ S.filter.onlyTodo = this.checked; save(); render(); };
+  document.getElementById('btnCompact').onclick = function(){
+    S.compact = !S.compact; this.classList.toggle('on', S.compact); save(); render();
+  };
+  document.getElementById('btnTools').onclick = function(){
+    var t = document.getElementById('tools');
+    t.hidden = !t.hidden;
+    this.classList.toggle('on', !t.hidden);
+  };
+  document.getElementById('noteX').onclick = function(){
+    S.noteHidden = true; document.getElementById('note').hidden = true; save();
+  };
+  document.getElementById('btnExport').onclick = exportFile;
+  document.getElementById('fileIn').onchange = function(){ if (this.files[0]) importFile(this.files[0]); this.value=''; };
+  document.getElementById('btnAddSchool').onclick = addSchool;
+  document.getElementById('btnReset').onclick = function(){
+    if (!confirm('모든 건과 체크를 지우고 처음 상태로 되돌릴까요?')) return;
+    S = freshState(); syncControls(); save(); render();
+  };
+}
+
+S = load();
+syncControls();
+bind();
+render();
+save();
+</script>
+</body>
+</html>
