@@ -142,6 +142,59 @@ td.mk.off button{color:#e2e8f0; cursor:default}
 .empty{padding:26px 10px; color:var(--muted); text-align:center}
 footer{padding:8px 12px; color:var(--muted); font-size:11px}
 
+/* ── 위젯(포스트잇) 모드 ─────────────────────────────
+   Document Picture-in-Picture 창이나 작은 팝업 창에서 이 모습으로 뜹니다. */
+body.wmode{background:#fef9c3; display:block}
+body.wmode > header, body.wmode > main, body.wmode > footer{display:none !important}
+.wgt{display:flex; flex-direction:column; height:100vh; font-size:12.5px}
+.wgt-hd{
+  display:flex; align-items:center; gap:5px; padding:6px 8px;
+  border-bottom:1px solid var(--line); background:var(--panel);
+}
+.wgt-hd b{font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px}
+.wgt-prog{color:var(--muted); font-size:11px; white-space:nowrap}
+.wgt-prog em{font-style:normal; color:var(--todo); font-weight:700}
+.wgt-ico{
+  border:1px solid var(--line); background:#fff; border-radius:6px;
+  padding:2px 6px; font-size:12px; line-height:1.35; color:#334155;
+}
+.wgt-ico:hover{background:#f8fafc}
+.wgt-ico.on{background:var(--accent-soft); border-color:#86efac; color:#14532d}
+.wgt-tabs{
+  display:flex; gap:4px; padding:5px 8px; overflow-x:auto;
+  border-bottom:1px solid var(--line); background:var(--panel);
+}
+.wgt-tab{
+  border:1px solid var(--line); background:#fff; border-radius:999px;
+  padding:2px 8px; font-size:11px; white-space:nowrap; color:#475569;
+}
+.wgt-tab.on{background:#0f172a; color:#fff; border-color:#0f172a}
+.wgt-list{flex:1 1 auto; overflow:auto; background:var(--panel)}
+.wgt-row{
+  display:flex; align-items:center; gap:5px; width:100%;
+  border:0; background:none; text-align:left; padding:3px 8px;
+  border-bottom:1px solid rgba(148,163,184,.18); font-size:12.5px;
+}
+.wgt-row:hover{background:#f8fafc}
+.wgt-row i{width:14px; text-align:center; font-style:normal; color:#cbd5e1; font-size:13px; flex:0 0 auto}
+.wgt-row .badge{width:15px; height:15px; line-height:15px; font-size:10px; margin:0; flex:0 0 auto}
+.wgt-row .t{flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.wgt-row .g{color:var(--muted); font-size:10.5px; flex:0 0 auto}
+.wgt-row.v1{background:var(--accent-soft)}
+.wgt-row.v1 i{color:var(--accent)}
+.wgt-row.v1 .t{color:var(--muted); text-decoration:line-through}
+.wgt-row.v2 .t{color:#94a3b8; text-decoration:line-through}
+.wgt-ft{
+  display:flex; align-items:center; gap:6px; padding:5px 8px;
+  border-top:1px solid var(--line); background:var(--panel); font-size:11px; color:var(--muted);
+}
+.wgt-ft .ck{font-size:11px}
+.wgt-hint{
+  padding:5px 8px; font-size:11px; line-height:1.4;
+  color:#92400e; background:#fffbeb; border-top:1px solid #fde68a;
+}
+.wgt-empty{padding:18px 10px; text-align:center; color:var(--muted); font-size:11.5px}
+
 /* 작게 보기 — 상시 띄워두는 좁은 창용 */
 body.compact{font-size:13px}
 body.compact h1{font-size:13.5px}
@@ -172,6 +225,13 @@ body.compact .note{display:none}
   .note{background:#422006; border-color:#854d0e; color:#fde68a}
   .note button{color:#fde68a}
   #tools{background:#0f172a}
+  body.wmode{background:#0f172a}
+  .wgt-ico{background:#1e293b; color:#cbd5e1}
+  .wgt-ico:hover{background:#334155}
+  .wgt-tab{background:#1e293b; color:#cbd5e1}
+  .wgt-tab.on{background:#e2e8f0; color:#0f172a; border-color:#e2e8f0}
+  .wgt-row:hover{background:#263449}
+  .wgt-hint{background:#422006; border-color:#854d0e; color:#fde68a}
 }
 </style>
 </head>
@@ -184,6 +244,7 @@ body.compact .note{display:none}
     <input id="q" type="search" placeholder="학교 검색" autocomplete="off">
     <span class="tfil" id="tfil"></span>
     <label class="ck"><input type="checkbox" id="onlyTodo"> 미제출만</label>
+    <button class="btn" id="btnWidget" title="포스트잇처럼 작은 창으로 띄웁니다 (맨 앞 고정)">📌 위젯</button>
     <button class="btn" id="btnCompact">작게</button>
     <button class="btn" id="btnTools">백업</button>
   </div>
@@ -293,6 +354,7 @@ function freshState(){
     filter: {q:'', types:{kinder:true, elem:true, mid:true, high:true}, onlyTodo:false},
     compact: false,
     noteHidden: false,
+    active: null,                               /* 위젯에서 보고 있는 건 */
     savedAt: ''
   };
 }
@@ -407,7 +469,7 @@ function render(){
     bAdd.title = '취합 건 추가 (최대 ' + MAX_CASES + '건)';
     bAdd.onclick = function(){
       S.cases.push(newCase('취합 ' + (S.cases.length + 1)));
-      save(); render();
+      save(); renderAll();
     };
     thAdd.appendChild(bAdd);
   }
@@ -443,6 +505,13 @@ function render(){
   document.getElementById('hdCount').textContent = ' · ' + sums.join(' · ');
 
   renderTypeFilter();
+
+  var bw = document.getElementById('btnWidget');
+  if (bw){
+    var on = !!(PIP && !PIP.closed);
+    bw.classList.toggle('on', on);
+    bw.textContent = on ? '📌 위젯 닫기' : '📌 위젯';
+  }
 }
 
 function caseHead(c, idx, all){
@@ -452,12 +521,12 @@ function caseHead(c, idx, all){
   var name = el('input', 'cs-name');
   name.value = c.name;
   name.title = '이름을 눌러 고치세요';
-  name.onchange = function(){ c.name = name.value.trim() || '이름 없는 건'; save(); render(); };
+  name.onchange = function(){ c.name = name.value.trim() || '이름 없는 건'; save(); renderAll(); };
   top.appendChild(name);
 
   var gear = el('button', 'cs-gear', '⚙');
   gear.title = '이 건 설정';
-  gear.onclick = function(){ c.open = !c.open; save(); render(); };
+  gear.onclick = function(){ c.open = !c.open; save(); renderAll(); };
   top.appendChild(gear);
   th.appendChild(top);
 
@@ -500,7 +569,7 @@ function casePanel(c, idx){
   TORDER.forEach(function(t){
     var b = el('button', 'btn' + (c.scope[t] ? ' on' : ''), TYPES[t].short);
     b.title = TYPES[t].label + ' 포함/제외';
-    b.onclick = function(){ c.scope[t] = !c.scope[t]; save(); render(); };
+    b.onclick = function(){ c.scope[t] = !c.scope[t]; save(); renderAll(); };
     r1.appendChild(b);
   });
   p.appendChild(r1);
@@ -508,7 +577,7 @@ function casePanel(c, idx){
   var r2 = el('div', 'row');
   r2.appendChild(el('label', null, '마감'));
   var d = el('input'); d.type = 'date'; d.value = c.due || '';
-  d.onchange = function(){ c.due = d.value; save(); render(); };
+  d.onchange = function(){ c.due = d.value; save(); renderAll(); };
   r2.appendChild(d);
   p.appendChild(r2);
 
@@ -520,7 +589,7 @@ function casePanel(c, idx){
   var bClear = el('button', 'btn', '체크 비우기');
   bClear.onclick = function(){
     if (!confirm('"' + c.name + '" 체크를 전부 지울까요?')) return;
-    c.marks = {}; save(); render();
+    c.marks = {}; save(); renderAll();
   };
   r3.appendChild(bClear);
 
@@ -528,7 +597,7 @@ function casePanel(c, idx){
     var bDel = el('button', 'btn danger', '건 삭제');
     bDel.onclick = function(){
       if (!confirm('"' + c.name + '" 을(를) 삭제할까요?')) return;
-      S.cases.splice(idx, 1); save(); render();
+      S.cases.splice(idx, 1); save(); renderAll();
     };
     r3.appendChild(bDel);
   }
@@ -558,7 +627,7 @@ function schoolRow(s){
       if (!confirm(s.n + ' 을(를) 목록에서 지울까요?')) return;
       S.extra = S.extra.filter(function(e){ return e.n !== s.n; });
       S.cases.forEach(function(c){ delete c.marks[s.n]; });
-      save(); render();
+      save(); renderAll();
     };
     td.appendChild(x);
   }
@@ -579,7 +648,7 @@ function schoolRow(s){
       b.title = s.n + ' — ' + c.name + ' : ' + MARK_TITLE[m];
       b.onclick = function(){
         c.marks[s.n] = (markOf(c, s) + 1) % 3;
-        save(); render();
+        save(); renderAll();
       };
       cell.appendChild(b);
     }
@@ -598,9 +667,214 @@ function renderTypeFilter(){
     var b = el('button', on ? 'on' : '', TYPES[t].short);
     b.title = TYPES[t].label + ' 보기/숨기기';
     if (on){ b.style.background = TYPES[t].color; b.style.borderColor = TYPES[t].color; }
-    b.onclick = function(){ S.filter.types[t] = !on; save(); render(); };
+    b.onclick = function(){ S.filter.types[t] = !on; save(); renderAll(); };
     wrap.appendChild(b);
   });
+}
+
+/* ── 위젯(포스트잇) 모드 ───────────────────────────
+   브라우저에서 "화면 맨 앞 고정" 이 되는 창은 Document Picture-in-Picture
+   하나뿐입니다(Chrome·Edge 116+). 그 창을 못 쓰면 작은 팝업으로 대신 열고,
+   맨 앞 고정은 운영체제 기능을 안내합니다. */
+
+var PIP = null;                                   /* 열려 있는 PiP 창 */
+var WIDGET_MODE = /widget/.test(location.hash);   /* 이 창 자체가 위젯(팝업)인가 */
+
+function pipSupported(){
+  return !!(window.documentPictureInPicture && documentPictureInPicture.requestWindow);
+}
+
+function activeCase(){
+  var c = null;
+  if (S.active) c = S.cases.filter(function(x){ return x.id === S.active; })[0];
+  return c || S.cases[0];
+}
+
+function renderAll(){
+  if (!WIDGET_MODE) render();
+  renderWidget();
+}
+
+function widgetDoc(){
+  if (PIP && !PIP.closed) return PIP.document;
+  if (WIDGET_MODE) return document;
+  return null;
+}
+
+function renderWidget(){
+  var doc = widgetDoc();
+  if (!doc) return;
+  var host = doc.getElementById('wgt');
+  if (!host){
+    host = doc.createElement('div');
+    host.id = 'wgt'; host.className = 'wgt';
+    doc.body.className = 'wmode';
+    doc.body.appendChild(host);
+  }
+  host.textContent = '';
+
+  var all = allSchools();
+  var c = activeCase();
+  var st = caseStat(c, all);
+
+  /* 머리 */
+  var hd = doc.createElement('div'); hd.className = 'wgt-hd';
+  var nm = doc.createElement('b'); nm.textContent = c.name; hd.appendChild(nm);
+  var pg = doc.createElement('span'); pg.className = 'wgt-prog';
+  pg.appendChild(doc.createTextNode(st.done + '/' + st.total + ' · 남은 '));
+  var em = doc.createElement('em'); em.textContent = String(st.todo); pg.appendChild(em);
+  hd.appendChild(pg);
+  var sp = doc.createElement('span'); sp.className = 'sp'; hd.appendChild(sp);
+
+  var pin = doc.createElement('button');
+  pin.className = 'wgt-ico' + (PIP ? ' on' : '');
+  pin.textContent = '📌';
+  pin.title = PIP ? '맨 앞 고정 해제 — 본창으로 되돌립니다' : '맨 앞 고정 (Chrome·Edge)';
+  pin.onclick = PIP ? closePip : pinFromPopup;
+  hd.appendChild(pin);
+
+  var big = doc.createElement('button');
+  big.className = 'wgt-ico'; big.textContent = '⤢';
+  big.title = '전체 표로 보기 (본창)';
+  big.onclick = function(){
+    try {
+      if (WIDGET_MODE && window.opener && !window.opener.closed){ window.opener.focus(); window.close(); }
+      else window.focus();
+    } catch(e){ /* 무시 */ }
+  };
+  hd.appendChild(big);
+  host.appendChild(hd);
+
+  /* 건 고르기 */
+  var tabs = doc.createElement('div'); tabs.className = 'wgt-tabs';
+  S.cases.forEach(function(x){
+    var t = doc.createElement('button');
+    var xs = caseStat(x, all);
+    t.className = 'wgt-tab' + (x.id === c.id ? ' on' : '');
+    t.textContent = x.name + ' ' + xs.done + '/' + xs.total;
+    t.onclick = function(){ S.active = x.id; save(); renderAll(); };
+    tabs.appendChild(t);
+  });
+  host.appendChild(tabs);
+
+  /* 목록 */
+  var list = doc.createElement('div'); list.className = 'wgt-list';
+  var rows = all.filter(function(sc){
+    if (!inScope(c, sc)) return false;
+    if (S.filter.onlyTodo && markOf(c, sc) !== 0) return false;
+    return true;
+  });
+  if (!rows.length){
+    var e = doc.createElement('div'); e.className = 'wgt-empty';
+    e.textContent = st.total && st.done === st.total ? '전부 제출됐습니다 ✓' : '대상 학교가 없습니다.';
+    list.appendChild(e);
+  }
+  rows.forEach(function(sc){
+    var m = markOf(c, sc);
+    var meta = TYPES[sc.t] || {short:'?', color:'#94a3b8'};
+    var b = doc.createElement('button');
+    b.className = 'wgt-row v' + m;
+    b.title = MARK_TITLE[m];
+
+    var i = doc.createElement('i'); i.textContent = MARKS[m] || '·'; b.appendChild(i);
+    var bg = doc.createElement('span'); bg.className = 'badge'; bg.textContent = meta.short;
+    bg.style.background = meta.color; b.appendChild(bg);
+    var t = doc.createElement('span'); t.className = 't'; t.textContent = sc.n; b.appendChild(t);
+    if (sc.ph){ var g = doc.createElement('span'); g.className = 'g'; g.textContent = sc.ph; b.appendChild(g); }
+
+    b.onclick = function(){ c.marks[sc.n] = (markOf(c, sc) + 1) % 3; save(); renderAll(); };
+    list.appendChild(b);
+  });
+  host.appendChild(list);
+
+  /* 바닥 */
+  var ft = doc.createElement('div'); ft.className = 'wgt-ft';
+  var lb = doc.createElement('label'); lb.className = 'ck';
+  var cb = doc.createElement('input'); cb.type = 'checkbox'; cb.checked = !!S.filter.onlyTodo;
+  cb.onchange = function(){ S.filter.onlyTodo = cb.checked; syncControls(); save(); renderAll(); };
+  lb.appendChild(cb); lb.appendChild(doc.createTextNode(' 미제출만'));
+  ft.appendChild(lb);
+  var sp2 = doc.createElement('span'); sp2.className = 'sp'; ft.appendChild(sp2);
+  var cp = doc.createElement('button'); cp.className = 'wgt-ico'; cp.textContent = '미제출 복사';
+  cp.onclick = function(){ copyTodo(c, cp); };
+  ft.appendChild(cp);
+  host.appendChild(ft);
+
+  /* 맨 앞 고정을 못 쓰는 브라우저 안내 */
+  if (!PIP && !pipSupported()){
+    var h = doc.createElement('div'); h.className = 'wgt-hint';
+    h.textContent = '이 브라우저는 "맨 앞 고정"(문서 PiP)을 지원하지 않습니다. ' +
+      'Chrome·Edge 에서 열면 📌 가 켜지고, 그대로 쓰시려면 운영체제의 ' +
+      '항상 위 기능(Windows: PowerToys Always On Top ⊞+Ctrl+T · macOS: 미션컨트롤 등)을 쓰세요.';
+    host.appendChild(h);
+  }
+}
+
+/* 본창 → PiP 창으로 띄우기 (사용자 클릭이 있어야 열립니다) */
+function openPip(){
+  if (PIP && !PIP.closed){ try { PIP.focus(); } catch(e){} return Promise.resolve(PIP); }
+  if (!pipSupported()) { openPopup(); return Promise.reject(new Error('unsupported')); }
+  return documentPictureInPicture.requestWindow({ width: 340, height: 520 }).then(function(w){
+    PIP = w;
+    var styles = document.querySelectorAll('style, link[rel=stylesheet]');
+    for (var i=0;i<styles.length;i++) w.document.head.appendChild(styles[i].cloneNode(true));
+    var ttl = w.document.createElement('title');
+    ttl.textContent = '무주 취합 체크리스트';
+    w.document.head.appendChild(ttl);
+    w.addEventListener('pagehide', function(){ PIP = null; render(); });
+    renderWidget();
+    render();
+    return w;
+  });
+}
+window.jbOpenPip = openPip;                       /* 팝업에서 본창에 부탁할 때 씁니다 */
+
+function closePip(){
+  if (PIP && !PIP.closed){ try { PIP.close(); } catch(e){} }
+  PIP = null;
+  if (!WIDGET_MODE) render();
+}
+
+/* PiP 를 못 쓰거나 꺼졌을 때 — 작은 팝업 창 */
+function openPopup(){
+  var url = location.href.split('#')[0] + '#widget';
+  var w = window.open(url, 'mujuCheckWidget', 'width=340,height=560,menubar=no,toolbar=no,location=no,status=no');
+  if (!w) alert('팝업이 막혀 있습니다. 주소창 오른쪽에서 이 사이트의 팝업을 허용해 주세요.');
+  else try { w.focus(); } catch(e){}
+}
+
+/* 팝업 위젯에서 📌 를 누른 경우 — 본창에 PiP 를 부탁합니다 */
+function pinFromPopup(){
+  if (!WIDGET_MODE){ openPip(); return; }
+  var op = null;
+  try { op = window.opener; } catch(e){ op = null; }
+  if (op && !op.closed && op.jbOpenPip){
+    Promise.resolve().then(function(){ return op.jbOpenPip(); }).then(function(){
+      window.close();
+    }, function(){
+      alert('본창에서 [📌 위젯] 을 눌러 주세요. (맨 앞 고정 창은 본창의 클릭으로만 열립니다)');
+      try { op.focus(); } catch(e){}
+    });
+  } else {
+    alert('본창(muju-check.html)을 열어 두고 [📌 위젯] 을 눌러 주세요.');
+  }
+}
+
+/* 창이 둘 이상일 때 서로 맞추기 — 팝업 위젯에서만 필요합니다 */
+function startSync(){
+  if (!WIDGET_MODE) return;
+  var last = null;
+  try { last = localStorage.getItem(KEY); } catch(e){ return; }
+  window.addEventListener('storage', function(ev){ if (ev.key === KEY) pull(); });
+  setInterval(pull, 1500);                        /* storage 이벤트가 안 오는 환경 대비 */
+  function pull(){
+    var cur;
+    try { cur = localStorage.getItem(KEY); } catch(e){ return; }
+    if (cur === last || cur == null) return;
+    last = cur;
+    var o = load();
+    if (o && o.cases && o.cases.length){ S = o; renderWidget(); }
+  }
 }
 
 /* ── 미제출 명단 복사 ─────────────────────────────── */
@@ -617,20 +891,23 @@ function copyTodo(c, btn){
     btn.textContent = '복사됨';
     setTimeout(function(){ btn.textContent = old; }, 1200);
   }
+  /* 위젯(PiP·팝업) 안에서 눌렸으면 그 창의 문서를 써야 합니다 */
+  var doc = btn.ownerDocument || document;
   if (navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(done, function(){ fallback(text, done); });
+    navigator.clipboard.writeText(text).then(done, function(){ fallback(text, done, doc); });
   } else {
-    fallback(text, done);
+    fallback(text, done, doc);
   }
 }
 
-function fallback(text, done){
-  var ta = document.createElement('textarea');
+function fallback(text, done, doc){
+  doc = doc || document;
+  var ta = doc.createElement('textarea');
   ta.value = text;
   ta.style.position = 'fixed'; ta.style.left = '-9999px';
-  document.body.appendChild(ta); ta.select();
-  try { document.execCommand('copy'); done(); } catch(e){ prompt('복사해서 쓰세요', text); }
-  document.body.removeChild(ta);
+  doc.body.appendChild(ta); ta.select();
+  try { doc.execCommand('copy'); done(); } catch(e){ (doc.defaultView || window).prompt('복사해서 쓰세요', text); }
+  doc.body.removeChild(ta);
 }
 
 /* ── 백업 ─────────────────────────────────────────── */
@@ -653,7 +930,7 @@ function importFile(file){
       S = o;
       S.extra = S.extra || [];
       S.filter = S.filter || freshState().filter;
-      syncControls(); save(); render();
+      syncControls(); save(); renderAll();
     } catch(e){ alert('불러오지 못했습니다: ' + e.message); }
   };
   r.readAsText(file);
@@ -671,7 +948,7 @@ function addSchool(){
   if (!t){ alert('유·초·중·고 중에서 골라주세요.'); return; }
   var ph = (prompt('읍·면 (비워도 됩니다)', '무주읍') || '').trim();
   S.extra.push({n:n, t:t, ph:ph, chk:1, user:true});
-  save(); render();
+  save(); renderAll();
 }
 
 /* ── 조작부 ───────────────────────────────────────── */
@@ -687,10 +964,15 @@ function syncControls(){
 }
 
 function bind(){
-  document.getElementById('q').oninput = function(){ S.filter.q = this.value; save(); render(); };
-  document.getElementById('onlyTodo').onchange = function(){ S.filter.onlyTodo = this.checked; save(); render(); };
+  document.getElementById('q').oninput = function(){ S.filter.q = this.value; save(); renderAll(); };
+  document.getElementById('onlyTodo').onchange = function(){ S.filter.onlyTodo = this.checked; save(); renderAll(); };
+  var bw = document.getElementById('btnWidget');
+  if (bw) bw.onclick = function(){
+    if (PIP && !PIP.closed) closePip();
+    else openPip().catch(function(){ /* 미지원 — openPip 안에서 팝업으로 넘깁니다 */ });
+  };
   document.getElementById('btnCompact').onclick = function(){
-    S.compact = !S.compact; this.classList.toggle('on', S.compact); save(); render();
+    S.compact = !S.compact; this.classList.toggle('on', S.compact); save(); renderAll();
   };
   document.getElementById('btnTools').onclick = function(){
     var t = document.getElementById('tools');
@@ -705,15 +987,22 @@ function bind(){
   document.getElementById('btnAddSchool').onclick = addSchool;
   document.getElementById('btnReset').onclick = function(){
     if (!confirm('모든 건과 체크를 지우고 처음 상태로 되돌릴까요?')) return;
-    S = freshState(); syncControls(); save(); render();
+    S = freshState(); syncControls(); save(); renderAll();
   };
 }
 
 S = load();
-syncControls();
-bind();
-render();
-save();
+if (WIDGET_MODE){
+  document.body.className = 'wmode';
+  document.title = '무주 취합 — 위젯';
+  renderWidget();
+  startSync();
+} else {
+  syncControls();
+  bind();
+  render();
+  save();
+}
 </script>
 </body>
 </html>
