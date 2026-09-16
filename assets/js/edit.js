@@ -161,9 +161,16 @@ window.JB = window.JB || {};
     });
   }
 
-  JB.editFormHtml = function (s, regionName, isNew, setKey) {
+  JB.editFormHtml = function (s, regionName, isNew, setKey, setChoices) {
     var what = setKey === 'kinder' ? '유치원' : setKey === 'special' ? '특수학교' : '학교';
-    var rows = fieldsFor(setKey).map(function (f) {
+    var pick = setChoices
+      ? '<label class="ef ef-full"><span>어느 목록에 넣을까요 *</span><select name="_set">' +
+          setChoices.map(function (k) {
+            return '<option value="' + k + '"' + (k === setKey ? ' selected' : '') + '>' +
+              (SET_NAME[k] || k) + '</option>';
+          }).join('') + '</select></label>'
+      : '';
+    var rows = pick + fieldsFor(setKey).map(function (f) {
       var v = s[f.k];
       var input;
       if (f.type === 'hidden') {

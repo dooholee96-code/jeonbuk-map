@@ -164,10 +164,105 @@ function baseStyle(s) {
 }
 function num(v) { return (v || 0).toLocaleString('ko-KR'); }
 
+/* 여러 지도가 함께 쓰는 조각들 */
+function ruralTag(s) {
+  return s.rural ? tag(s.rural === '운영' ? 'op' : 'hope',
+    (s.rural === '운영' ? '★' : '☆') + ' 농촌유학 ' + s.rural) : '';
+}
+function ruralRow(s) {
+  return s.rural ? '<div class="d-rural ' + (s.rural === '운영' ? 'op' : 'hope') + '">농촌유학 ' +
+    s.rural + '학교</div>' : '';
+}
+function spRow(s) {
+  return s.sp > 0 ? '<p class="d-row"><b>특수학급</b> ' + s.sp + '학급 · ' + (s.spStu || 0) + '명</p>' : '';
+}
+function ruralStyle(s) {
+  if (s.rural === '운영') return { cls: 'rural-op', dot: JB.RURAL.op.dot, text: JB.RURAL.op.text, mark: '★', weight: 100, boxed: true, size: 21 };
+  if (s.rural === '희망') return { cls: 'rural-hope', dot: JB.RURAL.hope.dot, text: JB.RURAL.hope.text, mark: '☆', weight: 90, boxed: true, size: 21 };
+  return null;
+}
+function specialStyle(s) {
+  return s.t === 'special'
+    ? { cls: 'special', dot: JB.TYPES.special.dot, text: JB.TYPES.special.text,
+        mark: '◆', weight: 120, boxed: true, size: 21 }
+    : null;
+}
+function kinderLabel(s) { return (JB.KINDER_KIND[s.kind] || {}).label || s.kind || ''; }
+
 JB.MAPS = {
-  /* ① 농촌유학 — 지금까지의 지도 그대로 */
+  /* ⓪ 전체 — 유치원·초·중·고·특수학교를 한 번에.
+     농촌유학 지도의 상위 집합이라, 농촌유학 표시는 여기서도 그대로 살려 둔다. */
+  all: {
+    label: '전체 (유·초·중·고·특수)',
+    unit: '곳', who: '학생·원아',
+    title: '전북 학교 통합지도',
+    keyLabel: '농촌유학·특수학교만',
+    headline: '14개 시군 유치원·초·중·고·특수학교',
+    sets: ['sch', 'kinder', 'special'],
+    include: function () { return true; },
+    filters: [['', '= 형태 전체 ='],
+              ['kinder', '유치원'], ['elem', '초등학교'], ['mid', '중학교'], ['high', '고등학교'],
+              ['special', '◆ 특수학교'],
+              ['op', '★ 농촌유학 운영학교'], ['hope', '☆ 농촌유학 희망학교'], ['rural', '농촌유학 운영＋희망'],
+              ['sp', '특수학급 설치교'], ['closed', '휴원 유치원']],
+    match: function (s, k) {
+      if (k === 'closed') return !!s.closed;
+      if (s.closed) return false;                  // 휴원한 원은 따로 고를 때만
+      if (k === 'op') return s.rural === '운영';
+      if (k === 'hope') return s.rural === '희망';
+      if (k === 'rural') return !!s.rural;
+      if (k === 'sp') return s.sp > 0;
+      return !k || s.t === k;
+    },
+    style: function (s) {
+      return ruralStyle(s) || specialStyle(s) ||
+        (s.closed ? { cls: 'closed', dot: '#cbd5e1', text: '#64748b', mark: '', weight: 5, boxed: false, size: 15 }
+                  : baseStyle(s));
+    },
+    labelPick: function (s) { return !!s.rural || s.t === 'special'; },
+    bump: function (s) { return s.rural ? 50 : s.t === 'special' ? 55 : s.t === 'kinder' ? -5 : 0; },
+    legend: function () {
+      return dots([['#f59e0b', '유치원'], ['#3b82f6', '초등학교'], ['#ef4444', '중학교'], ['#8b5cf6', '고등학교']]) +
+        '<div class="lg"><i style="background:#0ea5e9;width:17px;height:17px"></i> <b style="color:#075985">◆ 특수학교</b></div><hr>' +
+        '<div class="lg"><i style="background:#00e676;width:17px;height:17px"></i> <b style="color:#006400">★ 농촌유학 운영</b></div>' +
+        '<div class="lg"><i style="background:#ff9100;width:17px;height:17px"></i> <b style="color:#e65100">☆ 농촌유학 희망</b></div>';
+    },
+    stats: function (l) {
+      return [cnt(l, function (s) { return s.t === 'kinder'; }, '유', 'kinder'),
+              cnt(l, function (s) { return s.t === 'elem'; }, '초', 'elem'),
+              cnt(l, function (s) { return s.t === 'mid'; }, '중', 'mid'),
+              cnt(l, function (s) { return s.t === 'high'; }, '고', 'high'),
+              cnt(l, function (s) { return s.t === 'special'; }, '특수학교', 'special'),
+              cnt(l, function (s) { return s.rural === '운영'; }, '농촌유학 운영', 'op'),
+              cnt(l, function (s) { return s.rural === '희망'; }, '희망', 'hope'),
+              cnt(l, function (s) { return s.sp > 0; }, '특수학급', '')];
+    },
+    tags: function (s) {
+      return ruralTag(s) +
+             (s.t === 'special' && s.found ? tag('etc', s.found) : '') +
+             (s.t === 'kinder' ? tag('k', kinderLabel(s)) : '') +
+             (s.sp > 0 ? tag('sp', '특수학급 ' + s.sp) : '') +
+             (s.branch ? tag('etc', '분교') : '') +
+             (s.closed ? tag('warn', '휴원') : '');
+    },
+    rows: function (s) {
+      if (s.t === 'special') {
+        var lv = Object.keys(s.lv || {}).map(function (k) { return k + ' ' + s.lv[k] + '학급'; }).join(' · ');
+        return '<div class="d-rural special">◆ 특수학교' + (s.found ? ' (' + s.found + ')' : '') + '</div>' +
+               (lv ? '<p class="d-row"><b>과정</b> ' + esc(lv) + '</p>' : '');
+      }
+      return ruralRow(s) +
+             (s.t === 'kinder' ? '<p class="d-row"><b>설립</b> ' + esc(s.found || '') + ' · ' +
+                esc(kinderLabel(s)) + '</p>' : '') +
+             spRow(s) +
+             (s.closed ? '<div class="d-rural closed">휴원 중 (원아 없음)</div>' : '');
+    }
+  },
+
+  /* ① 농촌유학 — 초·중·고만 남겨 농촌유학 지정에 집중한다 */
   rural: {
     label: '농촌유학',
+    unit: '교', who: '학생',
     title: '학교·농촌유학 지도',
     keyLabel: '농촌유학만',
     headline: '14개 시군 초·중·고와 농촌유학 운영·희망학교',
@@ -181,11 +276,7 @@ JB.MAPS = {
       if (k === 'rural') return !!s.rural;
       return !k || s.t === k;
     },
-    style: function (s) {
-      if (s.rural === '운영') return { cls: 'rural-op', dot: JB.RURAL.op.dot, text: JB.RURAL.op.text, mark: '★', weight: 100, boxed: true, size: 21 };
-      if (s.rural === '희망') return { cls: 'rural-hope', dot: JB.RURAL.hope.dot, text: JB.RURAL.hope.text, mark: '☆', weight: 90, boxed: true, size: 21 };
-      return baseStyle(s);
-    },
+    style: function (s) { return ruralStyle(s) || baseStyle(s); },
     labelPick: function (s) { return !!s.rural; },
     bump: function (s) { return s.rural ? 50 : 0; },
     legend: function () {
@@ -200,19 +291,14 @@ JB.MAPS = {
               cnt(l, function (s) { return s.rural === '운영'; }, '농촌유학 운영', 'op'),
               cnt(l, function (s) { return s.rural === '희망'; }, '희망', 'hope')];
     },
-    tags: function (s) {
-      return (s.rural ? tag(s.rural === '운영' ? 'op' : 'hope',
-               (s.rural === '운영' ? '★' : '☆') + ' 농촌유학 ' + s.rural) : '') +
-             (s.branch ? tag('etc', '분교') : '');
-    },
-    rows: function (s) {
-      return (s.rural ? '<div class="d-rural ' + (s.rural === '운영' ? 'op' : 'hope') + '">농촌유학 ' + s.rural + '학교</div>' : '');
-    }
+    tags: function (s) { return ruralTag(s) + (s.branch ? tag('etc', '분교') : ''); },
+    rows: function (s) { return ruralRow(s) + spRow(s); }
   },
 
   /* ② 특수교육 — 특수학교 + 특수학급을 둔 유치원·초·중·고 */
   special: {
     label: '특수교육',
+    unit: '곳', who: '학생',
     title: '특수학교·특수학급 지도',
     keyLabel: '특수학교만',
     headline: '특수학교와 특수학급을 운영하는 유치원·초·중·고',
@@ -226,13 +312,7 @@ JB.MAPS = {
       if (k === 'cls') return s.t !== 'special';
       return !k || s.t === k;
     },
-    style: function (s) {
-      if (s.t === 'special') {
-        return { cls: 'special', dot: JB.TYPES.special.dot, text: JB.TYPES.special.text,
-                 mark: '◆', weight: 120, boxed: true, size: 21 };
-      }
-      return baseStyle(s);
-    },
+    style: function (s) { return specialStyle(s) || baseStyle(s); },
     labelPick: function (s) { return s.t === 'special'; },
     bump: function (s) { return s.t === 'special' ? 60 : Math.min((s.sp || 0) * 4, 20); },
     legend: function () {
@@ -259,13 +339,14 @@ JB.MAPS = {
         return '<div class="d-rural special">◆ 특수학교' + (s.found ? ' (' + s.found + ')' : '') + '</div>' +
                (lv ? '<p class="d-row"><b>과정</b> ' + esc(lv) + '</p>' : '');
       }
-      return '<p class="d-row"><b>특수학급</b> ' + s.sp + '학급 · ' + (s.spStu || 0) + '명</p>';
+      return spRow(s);
     }
   },
 
   /* ③ 유치원 */
   kinder: {
     label: '유치원',
+    unit: '원', who: '원아',
     title: '유치원 지도',
     keyLabel: '단설유치원만',
     headline: '14개 시군 공·사립 유치원',
@@ -301,14 +382,13 @@ JB.MAPS = {
               { v: num(stu), label: '원아', cls: '' }];
     },
     tags: function (s) {
-      return tag('k', (JB.KINDER_KIND[s.kind] || {}).label || s.kind) +
+      return tag('k', kinderLabel(s)) +
              (s.sp > 0 ? tag('sp', '특수학급 ' + s.sp) : '') +
              (s.closed ? tag('warn', '휴원') : '');
     },
     rows: function (s) {
-      return '<p class="d-row"><b>설립</b> ' + esc(s.found || '') + ' · ' +
-             esc((JB.KINDER_KIND[s.kind] || {}).label || s.kind || '') + '</p>' +
-             (s.sp > 0 ? '<p class="d-row"><b>특수학급</b> ' + s.sp + '학급 · ' + (s.spStu || 0) + '명</p>' : '') +
+      return '<p class="d-row"><b>설립</b> ' + esc(s.found || '') + ' · ' + esc(kinderLabel(s)) + '</p>' +
+             spRow(s) +
              (s.closed ? '<div class="d-rural closed">휴원 중 (원아 없음)</div>' : '');
     }
   }
@@ -323,7 +403,7 @@ function tag(cls, text) { return '<span class="tag t-' + cls + '">' + esc(text) 
 function cnt(list, f, label, cls) { return { v: list.filter(f).length, label: label, cls: cls }; }
 })();
 
-JB.MAP_ORDER = ['rural', 'special', 'kinder'];
+JB.MAP_ORDER = ['all', 'rural', 'special', 'kinder'];
 JB.MAP_STORE = 'jb.map';
 
 JB.mapKey = function () {
@@ -332,7 +412,7 @@ JB.mapKey = function () {
   if (JB.MAPS[q]) { JB.setMapKey(q); return q; }
   var k = null;
   try { k = localStorage.getItem(JB.MAP_STORE); } catch (e) { /* 사생활 보호 모드 */ }
-  return JB.MAPS[k] ? k : 'rural';
+  return JB.MAPS[k] ? k : 'all';
 };
 JB.setMapKey = function (k) {
   try { localStorage.setItem(JB.MAP_STORE, k); } catch (e) { /* 무시 */ }

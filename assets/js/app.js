@@ -6,7 +6,7 @@
   var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
 
   var state = {
-    map: 'rural',          // 지도 종류 — JB.MAPS 의 키 (rural | special | kinder)
+    map: 'all',            // 지도 종류 — JB.MAPS 의 키 (all | rural | special | kinder)
     region: null,          // null = 전북 전체 개요
     kind: '',              // [형태] 선택값 — 지도 종류마다 항목이 다르다
     labelMode: 'auto',     // auto | all | rural | none
@@ -14,7 +14,7 @@
     selected: null
   };
 
-  function def() { return JB.MAPS[state.map] || JB.MAPS.rural; }
+  function def() { return JB.MAPS[state.map] || JB.MAPS.all; }
 
   var map, overlays = [], maskPolygon = null, outlinePolys = [], items = [];
   var relayoutTimer = null;
@@ -64,7 +64,7 @@
   }
 
   /* ══════════════════════════════════════════════════════════
-     지도 종류 — 농촌유학 / 특수교육 / 유치원
+     지도 종류 — 전체 / 농촌유학 / 특수교육 / 유치원
      데이터와 색·범례·요약만 갈아끼우고 지도 엔진은 한 벌만 쓴다.
      ══════════════════════════════════════════════════════════ */
   function buildMapSelect() {
@@ -102,6 +102,7 @@
       '<hr><div class="lg"><i style="background:#94a3b8;border-style:dashed"></i> 좌표 추정</div>';
     var add = $('#editBar [data-act="add"]');
     if (add) add.textContent = '+ ' + (state.map === 'kinder' ? '유치원' : '학교') + ' 추가';
+    $('#search').placeholder = (state.map === 'kinder' ? '유치원명' : '학교명') + ' 또는 주소 검색';
   }
 
   function buildTypeSelect() {
@@ -334,7 +335,7 @@
   /* 기본은 전북 전체, 선택창에서 시·군을 고르면 그 지역만 본다 */
   function buildRegionSelect() {
     var sel = $('#regionSel');
-    var unit = state.map === 'kinder' ? '원' : '교';
+    var unit = def().unit;
     var total = JB.REGIONS.reduce(function (a, r) {
       var st = regionStats(r.key); return a + (st ? st.total : 0);
     }, 0);
@@ -598,8 +599,7 @@
       if (s.stu) stu += s.stu;
     });
 
-    var unit = state.map === 'kinder' ? '원' : '교';
-    var who = state.map === 'kinder' ? '원아' : '학생';
+    var unit = def().unit, who = def().who;
     var notes = noteList();
 
     $('#summary').innerHTML =
@@ -632,8 +632,7 @@
   function renderList(schools) {
     var list = $('#list');
     if (!schools.length) {
-      list.innerHTML = '<div class="empty">조건에 맞는 ' +
-        (state.map === 'kinder' ? '유치원' : '학교') + '이 없습니다.</div>';
+      list.innerHTML = '<div class="empty">조건에 맞는 곳이 없습니다.</div>';
       return;
     }
 
@@ -717,7 +716,7 @@
         (s.approx ? ' <em class="warn-inline">좌표 추정</em>' : '') + '</p>' +
       (JB.editMode
         ? '<div class="d-edit">' +
-            (state.map === 'rural'
+            (s._set === 'sch'
               ? '<div class="d-edit-label">농촌유학</div>' +
                 '<div class="seg">' +
                   seg('', '미지정', !s.rural) + seg('희망', '희망', s.rural === '희망') +
@@ -796,11 +795,11 @@
 
   /* 폼 열기 — school 이 없으면 새 학교 */
   var pickHandler = null;
-  function openForm(school, key) {
+  function openForm(school, key, forceSet) {
     var isNew = !school;
     var regionKey = key || (school && school._region) || state.region;
     if (!regionKey) return alert('먼저 시·군을 고르세요. 어느 지역에 넣을지 정해야 합니다.');
-    var setKey = (school && school._set) || def().sets[0];
+    var setKey = forceSet || (school && school._set) || def().sets[0];
     var payload = JB.setData(setKey, regionKey);
     if (!payload) {                       // 그 시군에 아직 이 묶음 파일이 없으면 빈 목록으로 연다
       payload = { updated: new Date().toISOString().slice(0, 10), note: '', schools: [] };
@@ -810,10 +809,19 @@
     var draft = school || defaultDraft(setKey);
 
     var box = $('#modal');
-    box.innerHTML = JB.editFormHtml(draft, region.name, isNew, setKey);
+    box.innerHTML = JB.editFormHtml(draft, region.name, isNew, setKey,
+      isNew && def().sets.length > 1 ? def().sets : null);
     box.hidden = false;
     document.body.classList.add('modal-open');
     var form = box.querySelector('.edit-form');
+
+    /* 전체 지도에서 새로 넣을 때는 어느 목록에 넣을지부터 고른다.
+       목록마다 적는 항목이 달라서 폼을 다시 그린다. */
+    var setPick = form.querySelector('[name="_set"]');
+    if (setPick) setPick.onchange = function () {
+      close();
+      openForm(null, regionKey, setPick.value);
+    };
 
     function close() {
       stopPick();
