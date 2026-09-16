@@ -1,2 +1,10 @@
 node_modules/
 .DS_Store
+
+# 포스트잇 위젯이 각자 PC에 쌓는 체크 기록
+muju_check_data.json
+muju_check_data.json.*
+
+# 파이썬 캐시
+__pycache__/
+*.pyc
