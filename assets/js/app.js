@@ -6,12 +6,15 @@
   var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
 
   var state = {
+    map: 'rural',          // 지도 종류 — JB.MAPS 의 키 (rural | special | kinder)
     region: null,          // null = 전북 전체 개요
-    kind: '',              // '' | elem | mid | high | op | hope | rural
+    kind: '',              // [형태] 선택값 — 지도 종류마다 항목이 다르다
     labelMode: 'auto',     // auto | all | rural | none
     query: '',
     selected: null
   };
+
+  function def() { return JB.MAPS[state.map] || JB.MAPS.rural; }
 
   var map, overlays = [], maskPolygon = null, outlinePolys = [], items = [];
   var relayoutTimer = null;
@@ -34,7 +37,11 @@
     map.createPane('jbLabels').style.zIndex = 630;
     map.getPane('jbLines').style.pointerEvents = 'none';
 
+    state.map = JB.mapKey();
+    buildMapSelect();
+    buildTypeSelect();
     buildRegionSelect();
+    applyMapChrome();
     bindControls();
     trackHeaderHeight();
     initSheet();
@@ -51,11 +58,58 @@
     selectRegion(fromHash && JB.regionByKey(fromHash) ? fromHash : null);
 
     if (stale.length) {
-      alert('데이터 파일이 갱신되어, 이 브라우저에 저장돼 있던 ' +
-        stale.map(function (k) { return JB.regionByKey(k).name; }).join('·') +
-        ' 편집분은 적용하지 않았습니다.\n' +
-        '필요하면 [편집] 막대의 [되돌리기]로 정리하세요.');
+      alert('데이터 파일이 갱신되어, 이 브라우저에 저장돼 있던 다음 편집분은 적용하지 않았습니다.\n  ' +
+        stale.join('\n  ') + '\n\n필요하면 [편집] 막대의 [되돌리기]로 정리하세요.');
     }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     지도 종류 — 농촌유학 / 특수교육 / 유치원
+     데이터와 색·범례·요약만 갈아끼우고 지도 엔진은 한 벌만 쓴다.
+     ══════════════════════════════════════════════════════════ */
+  function buildMapSelect() {
+    var sel = $('#mapSel');
+    sel.innerHTML = JB.MAP_ORDER.map(function (k) {
+      return '<option value="' + k + '">' + JB.MAPS[k].label + '</option>';
+    }).join('');
+    sel.value = state.map;
+    sel.onchange = function () { selectMap(sel.value); };
+  }
+
+  function selectMap(key) {
+    if (!JB.MAPS[key] || key === state.map) return;
+    state.map = key;
+    state.kind = '';
+    state.selected = null;
+    JB.setMapKey(key);
+    $('#detail').classList.remove('open');
+    if ($('#mapSel').value !== key) $('#mapSel').value = key;
+    buildTypeSelect();
+    buildRegionSelect();
+    applyMapChrome();
+    render();
+    fitRegion();
+  }
+
+  /* 제목·범례·[형태] 항목처럼 지도 종류에 딸린 껍데기를 한 번에 맞춘다 */
+  function applyMapChrome() {
+    var d = def();
+    document.body.dataset.map = state.map;
+    $('#panelTitle').lastChild.textContent = d.title;
+    $('#headSub').textContent = d.headline;
+    $('#labelKey').textContent = d.keyLabel;
+    $('#legendBody').innerHTML = d.legend() +
+      '<hr><div class="lg"><i style="background:#94a3b8;border-style:dashed"></i> 좌표 추정</div>';
+    var add = $('#editBar [data-act="add"]');
+    if (add) add.textContent = '+ ' + (state.map === 'kinder' ? '유치원' : '학교') + ' 추가';
+  }
+
+  function buildTypeSelect() {
+    var sel = $('#typeSel');
+    sel.innerHTML = def().filters.map(function (o) {
+      return '<option value="' + o[0] + '">' + o[1] + '</option>';
+    }).join('');
+    sel.value = state.kind;
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -252,27 +306,40 @@
   /* ══════════════════════════════════════════════════════════
      시군 탭
      ══════════════════════════════════════════════════════════ */
+  /* 지금 지도 종류가 쓰는 모든 묶음에서 이 시군의 대상 학교를 모은다.
+     읽기 전용 — 필터·검색은 activeSchools() 가 따로 건다. */
+  function regionRows(key) {
+    var d = def(), out = [];
+    d.sets.forEach(function (setKey) {
+      var payload = JB.setData(setKey, key);
+      if (!payload) return;
+      payload.schools.forEach(function (s) {
+        if (!d.include(s, setKey)) return;
+        s._region = key; s._set = setKey;
+        out.push(s);
+      });
+    });
+    return out;
+  }
+
+  /* 선택창의 시군별 숫자는 [형태]를 손대지 않았을 때 보이는 수와 맞춘다
+     (유치원 지도는 휴원한 원을 기본에서 빼므로 총계도 그만큼 줄어든다) */
   function regionStats(key) {
-    var d = JB.DATA[key];
-    if (!d) return null;
-    var s = d.schools;
-    return {
-      total: s.length,
-      op: s.filter(function (x) { return x.rural === '운영'; }).length,
-      hope: s.filter(function (x) { return x.rural === '희망'; }).length,
-      approx: s.filter(function (x) { return x.approx; }).length,
-      verified: d.verified
-    };
+    var d = def();
+    if (!d.sets.some(function (k) { return JB.setData(k, key); })) return null;
+    var rows = regionRows(key).filter(function (s) { return d.match(s, ''); });
+    return { total: rows.length, approx: rows.filter(function (x) { return x.approx; }).length };
   }
 
   /* 기본은 전북 전체, 선택창에서 시·군을 고르면 그 지역만 본다 */
   function buildRegionSelect() {
     var sel = $('#regionSel');
+    var unit = state.map === 'kinder' ? '원' : '교';
     var total = JB.REGIONS.reduce(function (a, r) {
       var st = regionStats(r.key); return a + (st ? st.total : 0);
     }, 0);
 
-    var html = '<option value="">= 전북 전체 (' + total + '교) =</option>';
+    var html = '<option value="">= 전북 전체 (' + total + unit + ') =</option>';
     [['시', /시$/], ['군', /군$/]].forEach(function (g) {
       var rows = JB.REGIONS.filter(function (r) { return g[1].test(r.name); })
         .sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
@@ -281,11 +348,12 @@
       rows.forEach(function (r) {
         var st = regionStats(r.key);
         html += '<option value="' + r.key + '">' + r.name +
-          (st ? ' (' + st.total + '교)' : ' (준비중)') + '</option>';
+          (st ? ' (' + st.total + unit + ')' : ' (준비중)') + '</option>';
       });
       html += '</optgroup>';
     });
     sel.innerHTML = html;
+    sel.value = state.region || '';
     sel.onchange = function () { selectRegion(sel.value || null); };
   }
 
@@ -361,34 +429,21 @@
      필터
      ══════════════════════════════════════════════════════════ */
   function activeSchools() {
-    var keys = state.region ? [state.region] : Object.keys(JB.DATA);
+    var d = def();
+    var keys = state.region ? [state.region] : JB.REGIONS.map(function (r) { return r.key; });
     var list = [];
-    keys.forEach(function (k) {
-      var d = JB.DATA[k];
-      if (!d) return;
-      d.schools.forEach(function (s) {
-        s._region = k;
-        list.push(s);
-      });
-    });
+    keys.forEach(function (k) { list = list.concat(regionRows(k)); });
+
     var q = state.query.trim().replace(/\s/g, '');
     var k = state.kind;
     return list.filter(function (s) {
-      if (k === 'op' && s.rural !== '운영') return false;
-      if (k === 'hope' && s.rural !== '희망') return false;
-      if (k === 'rural' && !s.rural) return false;
-      if ((k === 'elem' || k === 'mid' || k === 'high') && s.t !== k) return false;
+      if (!d.match(s, k)) return false;
       if (q && (s.n + (s.ph || '') + (s.addr || '')).replace(/\s/g, '').indexOf(q) < 0) return false;
       return true;
     });
   }
 
-  function styleOf(s) {
-    if (s.rural === '운영') return { cls: 'rural-op', dot: JB.RURAL.op.dot, text: JB.RURAL.op.text, mark: '★', weight: 100, boxed: true, size: 21 };
-    if (s.rural === '희망') return { cls: 'rural-hope', dot: JB.RURAL.hope.dot, text: JB.RURAL.hope.text, mark: '☆', weight: 90, boxed: true, size: 21 };
-    var t = JB.TYPES[s.t] || JB.TYPES.elem;
-    return { cls: s.t, dot: t.dot, text: t.text, mark: '', weight: t.rank * 10, boxed: false, size: 17 };
-  }
+  function styleOf(s) { return def().style(s); }
 
   /* ══════════════════════════════════════════════════════════
      지도 렌더링
@@ -452,8 +507,8 @@
         lock: !!s.lock,
         mox: s.ox || 0, moy: s.oy || 0,   // 데이터에 적힌 수동 오프셋 (재배치해도 보존)
         ox: s.ox || 0, oy: s.oy || 0,
-        baseWeight: st.weight + (s.rural ? 50 : 0),
-        weight: st.weight + (s.rural ? 50 : 0)
+        baseWeight: st.weight + def().bump(s),
+        weight: st.weight + def().bump(s)
       });
     });
 
@@ -500,9 +555,9 @@
       var p = map.latLngToContainerPoint(it.pos);
       it.x = p.x; it.y = p.y;
       var mode = state.labelMode;
-      if (mode === 'auto') mode = state.region ? 'all' : 'rural';   // 전북 전체에선 농촌유학만
+      if (mode === 'auto') mode = state.region ? 'all' : 'key';   // 전북 전체에선 핵심 대상만
       var isSel = it.school === state.selected;
-      var showLabel = isSel || mode === 'all' || (mode === 'rural' && !!it.school.rural);
+      var showLabel = isSel || mode === 'all' || (mode === 'key' && def().labelPick(it.school));
       it.weight = it.baseWeight + (isSel ? 1000 : 0);
       it.inView = p.x > -margin && p.y > -margin && p.x < view.w + margin && p.y < view.h + margin;
       if (it.inView && showLabel) visible.push(it);
@@ -537,40 +592,48 @@
      사이드 패널
      ══════════════════════════════════════════════════════════ */
   function renderSummary(schools) {
-    var byType = { elem: 0, mid: 0, high: 0 };
-    var op = 0, hope = 0, approx = 0, stu = 0;
+    var approx = 0, stu = 0;
     schools.forEach(function (s) {
-      byType[s.t] = (byType[s.t] || 0) + 1;
-      if (s.rural === '운영') op++;
-      if (s.rural === '희망') hope++;
       if (s.approx) approx++;
       if (s.stu) stu += s.stu;
     });
 
-    var d = state.region ? JB.DATA[state.region] : null;
+    var unit = state.map === 'kinder' ? '원' : '교';
+    var who = state.map === 'kinder' ? '원아' : '학생';
+    var notes = noteList();
 
     $('#summary').innerHTML =
-      '<div class="count-row">총 <b>' + schools.length + '</b>교' +
-        '<span class="count-sub">학생 ' + stu.toLocaleString('ko-KR') + '명</span></div>' +
-      '<div class="sum-stats">' +
-        stat(byType.elem, '초', 'elem') +
-        stat(byType.mid, '중', 'mid') +
-        stat(byType.high, '고', 'high') +
-        stat(op, '농촌유학 운영', 'op') +
-        stat(hope, '희망', 'hope') +
-      '</div>' +
-      (approx ? '<div class="warn">좌표 미확정 ' + approx + '개 — 데이터 파일의 <code>lat/lng</code> 를 확인하세요.</div>' : '') +
-      (d && d.note && !d.verified ? '<details class="note"><summary>데이터 출처·주의</summary><p>' + d.note + '</p></details>' : '');
+      '<div class="count-row">총 <b>' + schools.length + '</b>' + unit +
+        '<span class="count-sub">' + who + ' ' + stu.toLocaleString('ko-KR') + '명</span></div>' +
+      '<div class="sum-stats">' + def().stats(schools).map(stat).join('') + '</div>' +
+      (approx ? '<div class="warn">좌표 추정 ' + approx + '곳 — 도로명 주소가 아니라 읍·면·동 중심으로 찍은 위치입니다.</div>' : '') +
+      (notes.length ? '<details class="note"><summary>데이터 출처·주의</summary>' +
+        notes.map(function (n) { return '<p>' + esc(n) + '</p>'; }).join('') + '</details>' : '');
 
-    function stat(v, label, cls) {
-      return '<div class="stat ' + (cls || '') + '"><b>' + v + '</b><span>' + label + '</span></div>';
+    function stat(o) {
+      return '<div class="stat ' + (o.cls || '') + '"><b>' + o.v + '</b><span>' + o.label + '</span></div>';
     }
+  }
+
+  /* 지금 보고 있는 묶음들의 출처 문구 (중복 제거) */
+  function noteList() {
+    var seen = {}, out = [];
+    var keys = state.region ? [state.region] : JB.REGIONS.map(function (r) { return r.key; });
+    def().sets.forEach(function (setKey) {
+      keys.forEach(function (k) {
+        var p = JB.setData(setKey, k);
+        if (!p || !p.note || (setKey === 'sch' && p.verified) || seen[p.note]) return;
+        seen[p.note] = 1; out.push(p.note);
+      });
+    });
+    return out;
   }
 
   function renderList(schools) {
     var list = $('#list');
     if (!schools.length) {
-      list.innerHTML = '<div class="empty">조건에 맞는 학교가 없습니다.</div>';
+      list.innerHTML = '<div class="empty">조건에 맞는 ' +
+        (state.map === 'kinder' ? '유치원' : '학교') + '이 없습니다.</div>';
       return;
     }
 
@@ -596,7 +659,8 @@
     list.onclick = function (e) {
       var row = e.target.closest('.card');
       if (!row) return;
-      var s = (JB.DATA[row.dataset.region].schools || []).filter(function (x) { return x.n === row.dataset.name; })[0];
+      var p = JB.setData(row.dataset.set, row.dataset.region);
+      var s = p && p.schools.filter(function (x) { return x.n === row.dataset.name; })[0];
       if (!s) return;
       collapseForMap();
       selectSchool(s);
@@ -605,18 +669,16 @@
   }
 
   function card(s) {
-    var st = styleOf(s);
     var tags = '<span class="tag t-' + s.t + '">' + JB.TYPES[s.t].label + '</span>' +
-      (s.rural ? '<span class="tag t-' + (s.rural === '운영' ? 'op' : 'hope') + '">' +
-        st.mark + ' 농촌유학 ' + s.rural + '</span>' : '') +
-      (s.branch ? '<span class="tag t-etc">분교</span>' : '') +
-      (s.approx ? '<span class="tag t-warn">좌표 미확정</span>' : '');
+      def().tags(s) +
+      (s.approx ? '<span class="tag t-warn">좌표 추정</span>' : '');
 
     var meta = [];
     if (s.stu != null) meta.push(s.stu.toLocaleString('ko-KR') + '명');
     if (s.cls != null) meta.push(s.cls + '학급');
 
-    return '<li class="card" data-name="' + esc(s.n) + '" data-region="' + s._region + '">' +
+    return '<li class="card" data-name="' + esc(s.n) + '" data-region="' + s._region +
+      '" data-set="' + s._set + '">' +
       '<div class="tags">' + tags + '</div>' +
       '<div class="card-name">' + esc(s.n) + '</div>' +
       (s.addr ? '<div class="card-row i-map">' + esc(s.addr) + '</div>' : '') +
@@ -644,22 +706,24 @@
       '<div class="d-kind" style="color:' + st.text + '">' + (region ? region.name + ' · ' : '') +
         (s.ph ? s.ph + ' · ' : '') + JB.TYPES[s.t].label + '</div>' +
       '<h3>' + (st.mark ? st.mark + ' ' : '') + esc(s.n) + '</h3>' +
-      (s.rural ? '<div class="d-rural ' + (s.rural === '운영' ? 'op' : 'hope') + '">농촌유학 ' + s.rural + '학교</div>' : '') +
+      def().rows(s) +
       (s.addr ? '<p class="d-row"><b>주소</b> ' + esc(s.addr) + '</p>' : '') +
       (s.tel ? '<p class="d-row"><b>전화</b> ' + esc(s.tel) + '</p>' : '') +
-      (s.stu != null ? '<p class="d-row"><b>학생수</b> ' + s.stu.toLocaleString('ko-KR') + '명' +
-        (s.cls != null ? ' · ' + s.cls + '학급' : '') + '</p>' : '') +
+      (s.stu != null ? '<p class="d-row"><b>' + (s.t === 'kinder' ? '원아수' : '학생수') + '</b> ' +
+        s.stu.toLocaleString('ko-KR') + '명' + (s.cls != null ? ' · ' + s.cls + '학급' : '') + '</p>' : '') +
       (s.tags && s.tags.length ? '<div class="d-tags">' + s.tags.map(function (t) { return '<span>#' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
       (s.desc ? '<p class="d-desc">' + esc(s.desc) + '</p>' : '') +
       '<p class="d-coord">' + s.lat.toFixed(6) + ', ' + s.lng.toFixed(6) +
-        (s.approx ? ' <em class="warn-inline">좌표 미확정</em>' : '') + '</p>' +
+        (s.approx ? ' <em class="warn-inline">좌표 추정</em>' : '') + '</p>' +
       (JB.editMode
         ? '<div class="d-edit">' +
-            '<div class="d-edit-label">농촌유학</div>' +
-            '<div class="seg">' +
-              seg('', '미지정', !s.rural) + seg('희망', '희망', s.rural === '희망') +
-              seg('운영', '운영', s.rural === '운영') +
-            '</div>' +
+            (state.map === 'rural'
+              ? '<div class="d-edit-label">농촌유학</div>' +
+                '<div class="seg">' +
+                  seg('', '미지정', !s.rural) + seg('희망', '희망', s.rural === '희망') +
+                  seg('운영', '운영', s.rural === '운영') +
+                '</div>'
+              : '') +
             '<button class="btn small" id="btnEditSchool">정보 수정</button>' +
           '</div>'
         : '');
@@ -690,7 +754,7 @@
       else if (act === 'export') exportDirty();
       else if (act === 'discard') discardAll();
       else if (act === 'off') {
-        if (JB.dirtyRegions().length &&
+        if (JB.dirtySets().length &&
             !confirm('내보내지 않은 변경사항이 있습니다. 그래도 편집 모드를 끌까요?\n(변경사항은 지워지지 않습니다)')) return;
         location.search = '?edit=0';
       }
@@ -700,27 +764,27 @@
 
   function refreshEditBar() {
     if (!JB.editMode) return;
-    var dirty = JB.dirtyRegions();
+    var dirty = JB.dirtySets();
     $('#editCount').textContent = dirty.length
-      ? dirty.map(function (k) { return JB.regionByKey(k).name; }).join(', ') + ' 변경됨'
+      ? dirty.map(JB.setLabel).join(', ') + ' 변경됨'
       : '변경 없음';
     $('#editBar').classList.toggle('has-changes', dirty.length > 0);
   }
 
-  function commitRegion(key) {
-    JB.saveRegion(key);
+  function commitRegion(setKey, key) {
+    JB.saveSet(setKey, key);
     refreshEditBar();
     render();
   }
 
   function exportDirty() {
-    var dirty = JB.dirtyRegions();
+    var dirty = JB.dirtySets();
     if (!dirty.length) return alert('내보낼 변경사항이 없습니다.');
-    dirty.forEach(function (k, i) {
-      setTimeout(function () { JB.download(k + '.js', JB.exportRegion(k)); }, i * 350);
+    dirty.forEach(function (id, i) {
+      setTimeout(function () { JB.download(JB.setFileName(id), JB.exportSet(id)); }, i * 350);
     });
     alert(dirty.length + '개 파일을 내려받습니다.\n\n' +
-      dirty.map(function (k) { return '  ' + JB.regionByKey(k).name + ' → data/regions/' + k + '.js'; }).join('\n') +
+      dirty.map(function (id) { return '  ' + JB.setLabel(id) + ' → ' + JB.setPath(id); }).join('\n') +
       '\n\n저장소의 같은 경로에 덮어쓰면 모두에게 반영됩니다.');
   }
 
@@ -736,11 +800,17 @@
     var isNew = !school;
     var regionKey = key || (school && school._region) || state.region;
     if (!regionKey) return alert('먼저 시·군을 고르세요. 어느 지역에 넣을지 정해야 합니다.');
+    var setKey = (school && school._set) || def().sets[0];
+    var payload = JB.setData(setKey, regionKey);
+    if (!payload) {                       // 그 시군에 아직 이 묶음 파일이 없으면 빈 목록으로 연다
+      payload = { updated: new Date().toISOString().slice(0, 10), note: '', schools: [] };
+      JB.registerSet(setKey, regionKey, payload);
+    }
     var region = JB.regionByKey(regionKey);
-    var draft = school || { t: 'elem', lat: '', lng: '', ph: '' };
+    var draft = school || defaultDraft(setKey);
 
     var box = $('#modal');
-    box.innerHTML = JB.editFormHtml(draft, region.name, isNew);
+    box.innerHTML = JB.editFormHtml(draft, region.name, isNew, setKey);
     box.hidden = false;
     document.body.classList.add('modal-open');
     var form = box.querySelector('.edit-form');
@@ -761,30 +831,36 @@
       if (act === 'pick') return startPick(form, e.target);
       if (act === 'delete') {
         if (!confirm('“' + school.n + '” 을(를) 목록에서 지울까요?')) return;
-        var arr = JB.DATA[regionKey].schools;
+        var arr = payload.schools;
         arr.splice(arr.indexOf(school), 1);
         close(); $('#detail').classList.remove('open'); state.selected = null;
-        commitRegion(regionKey);
+        commitRegion(setKey, regionKey);
         return;
       }
       if (act === 'save') {
-        var res = JB.readEditForm(form, isNew ? {} : school);
+        var res = JB.readEditForm(form, isNew ? {} : school, setKey);
         if (res.error) return alert(res.error);
-        var arr = JB.DATA[regionKey].schools;
+        var arr = payload.schools;
         var dup = arr.filter(function (x) { return x.n === res.school.n && x !== school; })[0];
-        if (dup) return alert('같은 이름의 학교가 이미 있습니다: ' + res.school.n);
+        if (dup) return alert('같은 이름이 이미 있습니다: ' + res.school.n);
         if (isNew) arr.push(res.school);
         else { for (var k in school) if (k.charAt(0) !== '_') delete school[k];
                for (var k2 in res.school) school[k2] = res.school[k2]; }
         close();
-        commitRegion(regionKey);
+        commitRegion(setKey, regionKey);
         var saved = isNew ? arr[arr.length - 1] : school;
-        saved._region = regionKey;
+        saved._region = regionKey; saved._set = setKey;
         selectSchool(saved);
         map.setView([saved.lat, saved.lng], Math.max(map.getZoom(), 12));
         return;
       }
     };
+  }
+
+  function defaultDraft(setKey) {
+    if (setKey === 'kinder') return { t: 'kinder', kind: '병설', found: '공립', lat: '', lng: '', ph: '' };
+    if (setKey === 'special') return { t: 'special', found: '공립', lat: '', lng: '', ph: '' };
+    return { t: 'elem', lat: '', lng: '', ph: '' };
   }
 
   function startPick(form, btn) {
@@ -809,7 +885,7 @@
   /* 상세카드에서 농촌유학 상태만 빠르게 바꾼다 */
   function setRural(s, v) {
     if (v) s.rural = v; else delete s.rural;
-    commitRegion(s._region);
+    commitRegion(s._set, s._region);
     selectSchool(s);
   }
 

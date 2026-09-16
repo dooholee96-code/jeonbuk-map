@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>전북 농촌유학·학교 통합지도</title>
-<meta name="description" content="전북특별자치도 14개 시군의 초·중·고등학교와 농촌유학 운영·희망학교를 한 지도에서 봅니다.">
+<title>전북 학교지도 — 농촌유학·특수교육·유치원</title>
+<meta name="description" content="전북특별자치도 14개 시군의 유치원·초·중·고·특수학교를 농촌유학·특수교육·유치원 세 가지 지도로 봅니다.">
 <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="assets/css/app.css">
 </head>
@@ -13,8 +13,8 @@
 <header>
   <div class="head-top">
     <div class="brand">
-      <h1><span class="t-wide">전북 농촌유학·학교 통합지도</span><span class="t-narrow">전북 학교지도</span></h1>
-      <span class="sub">14개 시군 742개 초·중·고</span>
+      <h1><span class="t-wide">전북 학교 통합지도</span><span class="t-narrow">전북 학교지도</span></h1>
+      <span class="sub" id="headSub">14개 시군 초·중·고와 농촌유학 운영·희망학교</span>
     </div>
     <div class="head-tools">
       <label class="lblsel"><span>배경</span>
@@ -24,7 +24,7 @@
         <select id="labelMode">
           <option value="auto">자동</option>
           <option value="all">전체</option>
-          <option value="rural">농촌유학만</option>
+          <option value="key" id="labelKey">농촌유학만</option>
           <option value="none">숨기기</option>
         </select>
       </label>
@@ -47,19 +47,12 @@
     <button class="sheet-handle" id="sheetHandle" aria-label="목록 크기 조절"><span></span></button>
 
     <div class="panel-head">
-      <h2 class="panel-title"><span class="pin" aria-hidden="true"></span>학교·농촌유학 지도</h2>
+      <h2 class="panel-title" id="panelTitle"><span class="pin" aria-hidden="true"></span>학교·농촌유학 지도</h2>
 
       <div class="selects">
+        <select id="mapSel" class="map-sel" aria-label="지도 종류 선택"></select>
         <select id="regionSel" aria-label="지역 선택"></select>
-        <select id="typeSel" aria-label="형태 선택">
-          <option value="">= 형태 전체 =</option>
-          <option value="elem">초등학교</option>
-          <option value="mid">중학교</option>
-          <option value="high">고등학교</option>
-          <option value="op">★ 농촌유학 운영학교</option>
-          <option value="hope">☆ 농촌유학 희망학교</option>
-          <option value="rural">농촌유학 운영＋희망</option>
-        </select>
+        <select id="typeSel" aria-label="형태 선택"></select>
       </div>
 
       <div class="search-wrap">
@@ -82,14 +75,7 @@
 
     <details id="legend" open>
       <summary>범례</summary>
-      <div class="lg"><i style="background:#3b82f6"></i> 초등학교</div>
-      <div class="lg"><i style="background:#ef4444"></i> 중학교</div>
-      <div class="lg"><i style="background:#8b5cf6"></i> 고등학교</div>
-      <hr>
-      <div class="lg"><i style="background:#00e676;width:17px;height:17px"></i> <b style="color:#006400">★ 농촌유학 운영</b></div>
-      <div class="lg"><i style="background:#ff9100;width:17px;height:17px"></i> <b style="color:#e65100">☆ 농촌유학 희망</b></div>
-      <hr>
-      <div class="lg"><i style="background:#94a3b8;border-style:dashed"></i> 좌표 미확정</div>
+      <div id="legendBody"></div>
     </details>
 
   </div>
@@ -119,6 +105,31 @@
 <script src="data/regions/jeongju.js"></script>
 <script src="data/regions/iksan.js"></script>
 <script src="data/regions/gunsan.js"></script>
+
+<!-- 유치원 -->
+<script src="data/kinder/jinan.js"></script>
+<script src="data/kinder/imsil.js"></script>
+<script src="data/kinder/jeongeup.js"></script>
+<script src="data/kinder/sunchang.js"></script>
+<script src="data/kinder/namwon.js"></script>
+<script src="data/kinder/jangsu.js"></script>
+<script src="data/kinder/muju.js"></script>
+<script src="data/kinder/gochang.js"></script>
+<script src="data/kinder/buan.js"></script>
+<script src="data/kinder/wanju.js"></script>
+<script src="data/kinder/gimje.js"></script>
+<script src="data/kinder/jeongju.js"></script>
+<script src="data/kinder/iksan.js"></script>
+<script src="data/kinder/gunsan.js"></script>
+
+<!-- 특수학교 -->
+<script src="data/special/jeongeup.js"></script>
+<script src="data/special/namwon.js"></script>
+<script src="data/special/jangsu.js"></script>
+<script src="data/special/wanju.js"></script>
+<script src="data/special/jeongju.js"></script>
+<script src="data/special/iksan.js"></script>
+<script src="data/special/gunsan.js"></script>
 
 <script src="assets/js/labels.js"></script>
 <script src="assets/js/edit.js"></script>
